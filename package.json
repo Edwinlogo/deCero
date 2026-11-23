@@ -1,0 +1,29 @@
+{
+  "name": "estampa3d",
+  "version": "1.0.0",
+  "description": "PWA de camisas personalizables con vista 3D",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "icons": "node scripts/make-icons.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@fontsource/anton": "^5.3.0",
+    "@fontsource/bebas-neue": "^5.3.0",
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/lobster": "^5.3.0",
+    "@fontsource/pacifico": "^5.3.0",
+    "@fontsource/permanent-marker": "^5.3.0",
+    "@fontsource/righteous": "^5.3.0",
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "vite": "^8.3.8",
+    "vite-plugin-pwa": "^2.0.0"
+  }
+}

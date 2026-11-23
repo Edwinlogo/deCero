@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#4f46e5" />
+    <meta name="description" content="Diseña tu camisa personalizada en 3D: sube imágenes, añade texto, elige color y pídela." />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <title>Estampa3D · Camisas personalizadas en 3D</title>
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <div class="brand">
+          <img src="/favicon.svg" alt="" width="30" height="30" />
+          <span>Estampa<b>3D</b></span>
+        </div>
+        <div class="top-actions">
+          <button class="icon-btn" id="btn-undo" title="Deshacer (Ctrl+Z)" disabled>↶</button>
+          <button class="icon-btn" id="btn-redo" title="Rehacer (Ctrl+Y)" disabled>↷</button>
+          <button class="btn ghost hide-sm" id="btn-designs">Mis diseños</button>
+          <button class="btn ghost hide-sm" id="btn-export">Exportar</button>
+          <button class="btn ghost" id="btn-install" hidden>Instalar app</button>
+          <button class="btn primary" id="btn-cart">🛒 Carrito <span class="badge" id="cart-count">0</span></button>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section class="stage" id="stage">
+          <div id="viewport"></div>
+          <div class="stage-toolbar">
+            <button class="chip active" data-view="front">Frente</button>
+            <button class="chip" data-view="back">Espalda</button>
+            <button class="chip" id="btn-rotate">360°</button>
+            <button class="chip active" id="btn-guides" title="Mostrar guías de edición">Guías</button>
+            <label class="chip bg-chip" title="Color de fondo">
+              Fondo <input type="color" id="bg-color" value="#e8ecf3" />
+            </label>
+          </div>
+          <div class="stage-hint" id="stage-hint">Arrastra para girar · Rueda o pellizco para zoom · Toca un diseño para editarlo</div>
+          <div class="drop-overlay" id="drop-overlay">Suelta tu imagen aquí</div>
+          <div class="loading" id="loading"><div class="spinner"></div>Cargando visor 3D…</div>
+          <div class="offline-pill" id="offline-pill" hidden>Sin conexión · tu trabajo se guarda en el dispositivo</div>
+        </section>
+
+        <aside class="panel">
+          <nav class="tabs" id="tabs">
+            <button class="tab active" data-tab="product">Producto</button>
+            <button class="tab" data-tab="add">Añadir</button>
+            <button class="tab" data-tab="edit">Editar</button>
+          </nav>
+
+          <div class="tab-pages">
+            <!-- PRODUCTO -->
+            <section class="page active" id="tab-product">
+              <h3>Color</h3>
+              <div class="swatches" id="swatches"></div>
+              <div class="color-name" id="color-name"></div>
+
+              <h3>Cuello</h3>
+              <div class="seg" id="seg-neck">
+                <button data-v="round">Redondo</button>
+                <button data-v="v">En V</button>
+              </div>
+              <h3>Manga</h3>
+              <div class="seg" id="seg-sleeve">
+                <button data-v="short">Corta</button>
+                <button data-v="long">Larga</button>
+              </div>
+              <h3>Ajuste</h3>
+              <div class="seg" id="seg-fit">
+                <button data-v="regular">Regular</button>
+                <button data-v="oversize">Oversize</button>
+              </div>
+              <h3>Talla</h3>
+              <div class="sizes" id="sizes"></div>
+
+              <h3>Resumen de precio</h3>
+              <ul class="price-lines" id="price-lines"></ul>
+              <p class="muted small">Estampado en vinilo textil de alta resolución. Pedidos desde {{min}} unidades tienen descuento.</p>
+            </section>
+
+            <!-- AÑADIR -->
+            <section class="page" id="tab-add">
+              <h3>Imagen</h3>
+              <label class="dropzone" id="dropzone">
+                <input type="file" id="file-input" accept="image/*" hidden />
+                <span class="dz-icon">🖼️</span>
+                <b>Subir imagen</b>
+                <small>PNG, JPG, SVG o WebP · también puedes arrastrar o pegar (Ctrl+V)</small>
+              </label>
+
+              <h3>Texto</h3>
+              <button class="btn wide" id="btn-add-text">＋ Añadir texto</button>
+
+              <h3>Formas</h3>
+              <div class="grid shapes" id="shape-grid"></div>
+
+              <h3>Stickers</h3>
+              <div class="grid stickers" id="sticker-grid"></div>
+            </section>
+
+            <!-- EDITAR -->
+            <section class="page" id="tab-edit">
+              <div class="row between">
+                <h3 class="inline">Capas · <span id="side-label">Frente</span></h3>
+                <button class="btn tiny ghost" id="btn-clear-side">Vaciar lado</button>
+              </div>
+              <ul class="layers" id="layers"></ul>
+              <div id="props"></div>
+            </section>
+          </div>
+
+          <footer class="buybar">
+            <div class="buy-info">
+              <div class="buy-total" id="buy-total">—</div>
+              <div class="buy-sub" id="buy-sub"></div>
+            </div>
+            <div class="qty">
+              <button id="qty-minus" aria-label="Menos">−</button>
+              <span id="qty-val">1</span>
+              <button id="qty-plus" aria-label="Más">＋</button>
+            </div>
+            <button class="btn primary big" id="btn-add-cart">Añadir al carrito</button>
+          </footer>
+        </aside>
+      </main>
+    </div>
+
+    <!-- Carrito -->
+    <dialog id="dlg-cart" class="drawer">
+      <div class="dlg-head"><h2>Tu carrito</h2><button class="icon-btn close" data-close>✕</button></div>
+      <div class="dlg-body" id="cart-items"></div>
+      <div class="dlg-foot" id="cart-foot"></div>
+    </dialog>
+
+    <!-- Checkout -->
+    <dialog id="dlg-checkout" class="modal">
+      <div class="dlg-head"><h2>Finalizar pedido</h2><button class="icon-btn close" data-close>✕</button></div>
+      <form id="checkout-form" class="dlg-body form">
+        <label>Nombre completo<input name="name" required autocomplete="name" /></label>
+        <label>Teléfono / WhatsApp<input name="phone" required inputmode="tel" autocomplete="tel" /></label>
+        <label>Correo electrónico<input name="email" type="email" autocomplete="email" /></label>
+        <label>Dirección de entrega<textarea name="address" rows="2" required autocomplete="street-address"></textarea></label>
+        <label>Notas (opcional)<textarea name="notes" rows="2"></textarea></label>
+        <div class="checkout-total" id="checkout-total"></div>
+        <button class="btn primary big" type="submit">Confirmar pedido</button>
+      </form>
+      <div class="dlg-body" id="checkout-done" hidden></div>
+    </dialog>
+
+    <!-- Mis diseños -->
+    <dialog id="dlg-designs" class="modal">
+      <div class="dlg-head"><h2>Mis diseños</h2><button class="icon-btn close" data-close>✕</button></div>
+      <div class="dlg-body">
+        <form id="save-form" class="row gap">
+          <input id="design-name" placeholder="Nombre del diseño" maxlength="40" required />
+          <button class="btn primary" type="submit">Guardar actual</button>
+        </form>
+        <div class="designs-grid" id="designs-grid"></div>
+        <button class="btn ghost wide" id="btn-new">Empezar un diseño nuevo</button>
+      </div>
+    </dialog>
+
+    <!-- Exportar -->
+    <dialog id="dlg-export" class="modal small">
+      <div class="dlg-head"><h2>Exportar</h2><button class="icon-btn close" data-close>✕</button></div>
+      <div class="dlg-body export-list">
+        <button class="btn wide" data-export="mock-front">📷 Mockup frente (PNG)</button>
+        <button class="btn wide" data-export="mock-back">📷 Mockup espalda (PNG)</button>
+        <button class="btn wide" data-export="art-front">🎨 Arte para impresión · frente (PNG transparente)</button>
+        <button class="btn wide" data-export="art-back">🎨 Arte para impresión · espalda (PNG transparente)</button>
+      </div>
+    </dialog>
+
+    <div class="toasts" id="toasts"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
