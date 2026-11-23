@@ -14,7 +14,7 @@ import { registerSW } from 'virtual:pwa-register';
 import { CONFIG } from './config.js';
 import { state, on, emit, changed, serializeDesign, loadDesign, addElement, resetHistory } from './state.js';
 import { createViewer } from './viewer.js';
-import { initUI, toast } from './ui.js';
+import { initUI } from './ui.js';
 import { kvGet, kvSet } from './storage.js';
 
 registerSW({ immediate: true });
@@ -22,21 +22,25 @@ registerSW({ immediate: true });
 async function boot() {
   const viewer = createViewer(document.getElementById('viewport'));
   const ui = initUI(viewer);
-  window.__estampa = { state, viewer }; // útil para depurar
+  window.__estampa = { state, viewer };
 
-  // Fuentes (empaquetadas, funcionan sin conexión)
-  await Promise.all(CONFIG.fonts.map((f) => document.fonts.load(`100px "${f.family}"`).catch(() => null)));
+  // Esperar modelo 3D y fuentes empaquetadas
+  await Promise.all([
+    viewer.ready,
+    ...CONFIG.fonts.map((f) => document.fonts.load(`100px "${f.family}"`).catch(() => null)),
+  ]);
 
-  // Recupera el borrador anterior o crea un diseño de ejemplo.
+  // Recupera el borrador anterior (v2) o carga el preset inicial Pro
   const draft = await kvGet('draft', null);
-  if (draft && (draft.elements.front.length || draft.elements.back.length || draft.product)) {
+  if (draft && draft.v >= 2 && (draft.elements?.front?.length || draft.elements?.back?.length || draft.product)) {
     await loadDesign(draft);
   } else {
+    // Diseño inicial limpio estilo estudio
     emit('product');
     addElement({
-      type: 'text', text: 'TU DISEÑO\nAQUÍ', font: 'Anton', color: '#111111', strokeColor: '#000000', strokeW: 0,
-      curve: 0, spacing: 2, align: 'center', y: -0.35, s: 1.5,
-    });
+      type: 'text', text: 'DECERO\nSTUDIO', font: 'Anton', color: '#111827', strokeColor: '#000000', strokeW: 0,
+      curve: 0, spacing: 4, align: 'center', x: 0, y: -0.32, s: 1.3,
+    }, 'front');
     state.selectedId = null;
     resetHistory();
     changed(true);

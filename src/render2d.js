@@ -1,16 +1,44 @@
-// Dibujo 2D de las estampas sobre el lienzo (textura) de cada lado de la camiseta.
-// Espacio de diseño: unidades de la camiseta, origen en el centro del lienzo, x -> derecha, y -> ABAJO.
-// El lienzo cubre [-1.5, 1.5] en ambos ejes. 1 unidad = PPU píxeles.
+// Motor de texturizado 2D (Atlas 2048x2048) para el modelo 3D shirt_baked.glb.
+// Mapea zonas de confección (frente, espalda, mangas, cuello), patrones sublimados y estampados.
 import { images } from './state.js';
-import { bodyHalfWidth, neckDepth, NECK_W, TOP_Y } from './shirt3d.js';
 
-export const SIZE = 1536;
-export const PPU = SIZE / 3;
-// Tamaño base (en centésimas de unidad) de cada tipo de elemento con s = 1.
-export const BASE = { image: 60, shape: 50, emoji: 40, text: 20 };
-const TEXT_PX = 100; // los textos se dibujan a 100px y se escalan
+export const ATLAS_SIZE = 2048;
+export const UV_UNIT = 0.165; // 1 unidad de diseño = 0.165 en espacio UV (proporción 1:1)
+export const PPU = UV_UNIT * ATLAS_SIZE;
+
+// Islas UV exactas de shirt_baked.glb (flipY = false: v=0 arriba, v=1 abajo)
+export const UV_ZONES = {
+  front: { u0: 0.0, v0: 0.0, u1: 0.502, v1: 0.721 },
+  back: { u0: 0.502, v0: 0.0, u1: 1.0, v1: 0.721 },
+  sleeveR: { u0: 0.0, v0: 0.721, u1: 0.385, v1: 0.941 },
+  sleeveL: { u0: 0.385, v0: 0.721, u1: 0.765, v1: 0.941 },
+  collar: { u0: 0.0, v0: 0.941, u1: 0.55, v1: 1.0 },
+};
+
+// Centros UV del área de estampado para frente y espalda
+export const SIDE_CENTER = {
+  front: { u: 0.26, v: 0.375 },
+  back: { u: 0.742, v: 0.375 },
+};
+
+// Convierte UV del GLB -> lado y coordenadas de diseño (x: derecha, y: abajo)
+export function uvToDesign(u, v, forceSide = null) {
+  let side = forceSide;
+  if (!side) {
+    if (v > 0.721) return null;
+    side = u < 0.502 ? 'front' : 'back';
+  }
+  const c = SIDE_CENTER[side];
+  return {
+    side,
+    pt: { x: (u - c.u) / UV_UNIT, y: (v - c.v) / UV_UNIT },
+  };
+}
+
+// Tamaño base (en centésimas de unidad de diseño) con s = 1
+export const BASE = { image: 65, shape: 52, emoji: 44, text: 22 };
+const TEXT_PX = 100;
 const EMOJI_FONT = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
-
 const measureCtx = document.createElement('canvas').getContext('2d');
 
 // ---------- Texto ----------
@@ -25,11 +53,10 @@ function textLayout(el) {
     return w;
   });
   const maxW = Math.max(...widths, 1);
-  const lineH = TEXT_PX * 1.1;
+  const lineH = TEXT_PX * 1.08;
   return { lines, widths, maxW, lineH, h: lines.length * lineH };
 }
 
-/** Caja local (antes de escalar por s) en centésimas de unidad. */
 function localSize(el) {
   switch (el.type) {
     case 'image': {
@@ -61,7 +88,6 @@ function localSize(el) {
   }
 }
 
-/** Caja en unidades de la camiseta (ya escalada). */
 export function getBounds(el) {
   const b = localSize(el);
   return { w: (b.w * el.s) / 100, h: (b.h * el.s) / 100 };
@@ -194,10 +220,10 @@ function drawShape(ctx, el) {
   }
 }
 
-export function drawElement(ctx, el, ppu = PPU, ox = 0, oy = 0) {
+export function drawElement(ctx, el, ppu = PPU, cx = 0, cy = 0) {
   if (el.hidden) return;
   ctx.save();
-  ctx.translate((el.x + 1.5) * ppu - ox, (el.y + 1.5) * ppu - oy);
+  ctx.translate(cx + el.x * ppu, cy + el.y * ppu);
   ctx.rotate((el.rot * Math.PI) / 180);
   const k = (el.s * ppu) / 100;
   ctx.scale(k, k);
@@ -228,9 +254,147 @@ export function drawElement(ctx, el, ppu = PPU, ox = 0, oy = 0) {
   ctx.restore();
 }
 
+// ---------- Patrones textiles estilo Spized ----------
+function drawPattern(ctx, rect, pattern, color, alpha) {
+  if (!pattern || pattern === 'solid' || alpha <= 0) return;
+  const x = rect.u0 * ATLAS_SIZE;
+  const y = rect.v0 * ATLAS_SIZE;
+  const w = (rect.u1 - rect.u0) * ATLAS_SIZE;
+  const h = (rect.v1 - rect.v0) * ATLAS_SIZE;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = color;
+  ctx.strokeStyle = color;
+
+  switch (pattern) {
+    case 'gradient-v': {
+      const g = ctx.createLinearGradient(x, y + h * 0.15, x, y + h * 0.95);
+      g.addColorStop(0, 'rgba(0,0,0,0)');
+      g.addColorStop(1, color);
+      ctx.fillStyle = g;
+      ctx.fillRect(x, y, w, h);
+      break;
+    }
+    case 'gradient-d': {
+      const g = ctx.createLinearGradient(x, y, x + w, y + h);
+      g.addColorStop(0, 'rgba(0,0,0,0)');
+      g.addColorStop(0.55, color);
+      g.addColorStop(1, color);
+      ctx.fillStyle = g;
+      ctx.fillRect(x, y, w, h);
+      break;
+    }
+    case 'stripes-v': {
+      const n = 9;
+      const step = w / n;
+      for (let i = 0; i < n; i += 2) {
+        ctx.fillRect(x + i * step + step * 0.15, y, step * 0.45, h);
+      }
+      break;
+    }
+    case 'stripes-h': {
+      const n = 10;
+      const step = h / n;
+      for (let i = 1; i < n; i += 2) {
+        ctx.fillRect(x, y + i * step, w, step * 0.42);
+      }
+      break;
+    }
+    case 'band-chest': {
+      const by = y + h * 0.34;
+      const bh = h * 0.18;
+      ctx.fillRect(x, by, w, bh);
+      ctx.fillRect(x, by - bh * 0.22, w, bh * 0.1);
+      ctx.fillRect(x, by + bh * 1.12, w, bh * 0.1);
+      break;
+    }
+    case 'chevron': {
+      const cx = x + w * 0.5;
+      for (let k = 0; k < 3; k++) {
+        const y0 = y + h * (0.28 + k * 0.13);
+        const thick = h * 0.065;
+        ctx.beginPath();
+        ctx.moveTo(x, y0 - h * 0.12);
+        ctx.lineTo(cx, y0 + h * 0.08);
+        ctx.lineTo(x + w, y0 - h * 0.12);
+        ctx.lineTo(x + w, y0 - h * 0.12 + thick);
+        ctx.lineTo(cx, y0 + h * 0.08 + thick);
+        ctx.lineTo(x, y0 - h * 0.12 + thick);
+        ctx.closePath();
+        ctx.fill();
+      }
+      break;
+    }
+    case 'split': {
+      ctx.beginPath();
+      ctx.moveTo(x + w * 0.62, y);
+      ctx.lineTo(x + w, y);
+      ctx.lineTo(x + w, y + h);
+      ctx.lineTo(x + w * 0.18, y + h);
+      ctx.closePath();
+      ctx.fill();
+      // línea acento paralela
+      ctx.lineWidth = w * 0.022;
+      ctx.beginPath();
+      ctx.moveTo(x + w * 0.55, y);
+      ctx.lineTo(x + w * 0.11, y + h);
+      ctx.stroke();
+      break;
+    }
+    case 'hex': {
+      const r = 34;
+      const dx = r * 1.5;
+      const dy = r * Math.sqrt(3);
+      ctx.lineWidth = 3.5;
+      for (let row = -1; row < h / dy + 2; row++) {
+        for (let col = -1; col < w / dx + 2; col++) {
+          const hx = x + col * dx;
+          const hy = y + row * dy + (col % 2 ? dy / 2 : 0);
+          ctx.beginPath();
+          for (let i = 0; i < 6; i++) {
+            const a = (Math.PI / 3) * i;
+            const px = hx + (r - 4) * Math.cos(a);
+            const py = hy + (r - 4) * Math.sin(a);
+            i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+          }
+          ctx.closePath();
+          ctx.stroke();
+        }
+      }
+      break;
+    }
+    case 'camo': {
+      // Polígonos geométricos modernos deterministas
+      let seed = 42;
+      const rnd = () => {
+        seed = (seed * 1664525 + 1013904223) % 4294967296;
+        return seed / 4294967296;
+      };
+      for (let i = 0; i < 48; i++) {
+        const px = x + rnd() * w;
+        const py = y + rnd() * h;
+        const s = 45 + rnd() * 130;
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        ctx.lineTo(px + (rnd() - 0.3) * s, py + (rnd() - 0.5) * s);
+        ctx.lineTo(px + (rnd() - 0.5) * s, py + (rnd() + 0.2) * s);
+        ctx.lineTo(px - rnd() * s * 0.7, py + (rnd() - 0.2) * s);
+        ctx.closePath();
+        ctx.fill();
+      }
+      break;
+    }
+  }
+  ctx.restore();
+}
+
 // ---------- Guías de edición ----------
-const PAD = 0.03;
-const HANDLE_R = 0.055;
+const PAD = 0.04;
+const HANDLE_R = 0.065;
 
 function handlePositions(el) {
   const b = getBounds(el);
@@ -238,7 +402,7 @@ function handlePositions(el) {
   const hh = b.h / 2 + PAD;
   return {
     scale: [hw, hh],
-    rotate: [0, -hh - 0.14],
+    rotate: [0, -hh - 0.16],
     delete: [-hw, -hh],
   };
 }
@@ -252,7 +416,7 @@ export function hitHandle(el, pt) {
   const hp = handlePositions(el);
   for (const name of ['delete', 'rotate', 'scale']) {
     const w = toWorld(el, hp[name]);
-    if (Math.hypot(pt.x - w.x, pt.y - w.y) <= HANDLE_R * 1.5) return name;
+    if (Math.hypot(pt.x - w.x, pt.y - w.y) <= HANDLE_R * 1.6) return name;
   }
   return null;
 }
@@ -265,114 +429,129 @@ export function hitElement(el, pt) {
   const dy = pt.y - el.y;
   const lx = dx * Math.cos(a) - dy * Math.sin(a);
   const ly = dx * Math.sin(a) + dy * Math.cos(a);
-  return Math.abs(lx) <= b.w / 2 + 0.01 && Math.abs(ly) <= b.h / 2 + 0.01;
+  return Math.abs(lx) <= b.w / 2 + 0.02 && Math.abs(ly) <= b.h / 2 + 0.02;
 }
 
-function drawGuides(ctx, el) {
+function drawGuides(ctx, el, cx, cy) {
   const b = getBounds(el);
   const hw = b.w / 2 + PAD;
   const hh = b.h / 2 + PAD;
   ctx.save();
-  ctx.translate((el.x + 1.5) * PPU, (el.y + 1.5) * PPU);
+  ctx.translate(cx + el.x * PPU, cy + el.y * PPU);
   ctx.rotate((el.rot * Math.PI) / 180);
-  ctx.strokeStyle = '#4f46e5';
+  ctx.strokeStyle = '#3b82f6';
   ctx.lineWidth = 3;
-  ctx.setLineDash([14, 9]);
+  ctx.setLineDash([12, 8]);
   ctx.strokeRect(-hw * PPU, -hh * PPU, hw * 2 * PPU, hh * 2 * PPU);
   ctx.setLineDash([]);
   const hp = handlePositions(el);
-  // línea hacia el control de rotación
   ctx.beginPath();
   ctx.moveTo(0, -hh * PPU);
   ctx.lineTo(hp.rotate[0] * PPU, hp.rotate[1] * PPU);
   ctx.stroke();
-  const dot = (name, bg, glyph) => {
+  const dot = (name, bg, fg, glyph) => {
     const [x, y] = hp[name];
     ctx.beginPath();
     ctx.arc(x * PPU, y * PPU, HANDLE_R * PPU, 0, Math.PI * 2);
     ctx.fillStyle = bg;
     ctx.fill();
     ctx.lineWidth = 3;
-    ctx.strokeStyle = '#4f46e5';
+    ctx.strokeStyle = fg;
     ctx.stroke();
-    ctx.fillStyle = '#4f46e5';
+    ctx.fillStyle = fg;
     ctx.font = `bold ${HANDLE_R * PPU * 1.3}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(glyph, x * PPU, y * PPU + 1);
   };
-  dot('scale', '#fff', '⤡');
-  dot('rotate', '#fff', '↻');
-  dot('delete', '#fff', '×');
+  dot('scale', '#ffffff', '#2563eb', '⤡');
+  dot('rotate', '#ffffff', '#2563eb', '↻');
+  dot('delete', '#ffffff', '#e11d48', '×');
   ctx.restore();
 }
 
-function drawPrintArea(ctx) {
+function drawPrintArea(ctx, side) {
+  const c = SIDE_CENTER[side];
+  const cx = c.u * ATLAS_SIZE;
+  const cy = c.v * ATLAS_SIZE;
   ctx.save();
-  ctx.strokeStyle = 'rgba(79,70,229,.35)';
-  ctx.lineWidth = 3;
-  ctx.setLineDash([22, 16]);
-  const x = -0.62;
-  const y = -0.95;
-  const w = 1.24;
-  const h = 1.75;
-  ctx.strokeRect((x + 1.5) * PPU, (y + 1.5) * PPU, w * PPU, h * PPU);
+  ctx.strokeStyle = 'rgba(59, 130, 246, 0.35)';
+  ctx.lineWidth = 2.5;
+  ctx.setLineDash([16, 12]);
+  const w = 1.48 * PPU;
+  const h = 2.05 * PPU;
+  ctx.strokeRect(cx - w / 2, cy - h / 2 - 0.08 * PPU, w, h);
   ctx.restore();
 }
 
-function drawStitches(ctx, color, fit) {
-  const hw = bodyHalfWidth(-1.33, fit);
-  const yA = (1.5 + 1.33) * PPU;
-  ctx.save();
-  ctx.strokeStyle = 'rgba(0,0,0,.16)';
-  ctx.lineWidth = 2;
-  ctx.setLineDash([9, 7]);
-  for (const dy of [0, 10]) {
-    ctx.beginPath();
-    ctx.moveTo((1.5 - hw + 0.02) * PPU, yA + dy);
-    ctx.lineTo((1.5 + hw - 0.02) * PPU, yA + dy);
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
-/** Pinta el lado completo de la camiseta en ctx (lienzo SIZE x SIZE). */
-export function paintSide(ctx, side, { elements, product, guides = true, selectedId = null }) {
+/** Pinta el atlas completo 2048x2048 de la camiseta 3D. */
+export function paintAtlas(ctx, { elements, product, guides = true, selectedId = null }) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.clearRect(0, 0, SIZE, SIZE);
-  ctx.fillStyle = product.color;
-  ctx.fillRect(0, 0, SIZE, SIZE);
-  drawStitches(ctx, product.color, product.fit);
-  for (const el of elements[side]) drawElement(ctx, el);
+  const z = product.zones || {};
+  const base = product.color || '#f5f5f2';
 
-  // recorte del escote (alfa 0, la geometría usa alphaTest)
-  ctx.save();
-  ctx.globalCompositeOperation = 'destination-out';
-  ctx.fillStyle = '#000';
-  ctx.beginPath();
-  const n = 60;
-  const yTop = 1.5 - TOP_Y; // (y_diseño + 1.5) del borde superior del escote
-  for (let i = 0; i <= n; i++) {
-    const x = -NECK_W + (2 * NECK_W * i) / n;
-    const y = yTop + neckDepth(x, product.neck, side);
-    const px = (x + 1.5) * PPU;
-    i ? ctx.lineTo(px, y * PPU) : ctx.moveTo(px, y * PPU);
+  // Fondo base para cubrir costuras/márgenes de sangrado
+  ctx.fillStyle = z.front || base;
+  ctx.fillRect(0, 0, ATLAS_SIZE, ATLAS_SIZE);
+
+  // Relleno por zona de confección
+  const fillZone = (rect, col) => {
+    ctx.fillStyle = col || base;
+    ctx.fillRect(
+      rect.u0 * ATLAS_SIZE,
+      rect.v0 * ATLAS_SIZE,
+      (rect.u1 - rect.u0) * ATLAS_SIZE,
+      (rect.v1 - rect.v0) * ATLAS_SIZE,
+    );
+  };
+  fillZone(UV_ZONES.front, z.front || base);
+  fillZone(UV_ZONES.back, z.back || base);
+  fillZone(UV_ZONES.sleeveR, z.sleeveR || base);
+  fillZone(UV_ZONES.sleeveL, z.sleeveL || base);
+  fillZone(UV_ZONES.collar, z.collar || base);
+
+  // Patrón sublimado sobre cuerpo (frente y espalda) y sutil en mangas si aplica
+  if (product.pattern && product.pattern !== 'solid') {
+    const pCol = product.patternColor || '#132448';
+    const pAlpha = product.patternAlpha ?? 0.85;
+    drawPattern(ctx, UV_ZONES.front, product.pattern, pCol, pAlpha);
+    drawPattern(ctx, UV_ZONES.back, product.pattern, pCol, pAlpha);
+    if (['hex', 'camo', 'gradient-v', 'stripes-h'].includes(product.pattern)) {
+      drawPattern(ctx, UV_ZONES.sleeveR, product.pattern, pCol, pAlpha * 0.7);
+      drawPattern(ctx, UV_ZONES.sleeveL, product.pattern, pCol, pAlpha * 0.7);
+    }
   }
-  ctx.lineTo((NECK_W + 1.5) * PPU, -10);
-  ctx.lineTo((-NECK_W + 1.5) * PPU, -10);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
 
-  if (guides) {
-    drawPrintArea(ctx);
-    const sel = elements[side].find((e) => e.id === selectedId);
-    if (sel) drawGuides(ctx, sel);
+  // Estampados en frente y espalda (recortados a su zona UV para no invadir la otra cara)
+  for (const side of ['front', 'back']) {
+    const rect = UV_ZONES[side];
+    const c = SIDE_CENTER[side];
+    const cx = c.u * ATLAS_SIZE;
+    const cy = c.v * ATLAS_SIZE;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(
+      rect.u0 * ATLAS_SIZE,
+      rect.v0 * ATLAS_SIZE,
+      (rect.u1 - rect.u0) * ATLAS_SIZE,
+      (rect.v1 - rect.v0) * ATLAS_SIZE,
+    );
+    ctx.clip();
+
+    for (const el of elements[side]) {
+      drawElement(ctx, el, PPU, cx, cy);
+    }
+    if (guides) {
+      drawPrintArea(ctx, side);
+      const sel = elements[side].find((e) => e.id === selectedId);
+      if (sel) drawGuides(ctx, sel, cx, cy);
+    }
+    ctx.restore();
   }
 }
 
 /** Exporta sólo el arte de un lado (PNG transparente recortado a las estampas). */
-export function exportArt(elements, side, scale = 2) {
+export function exportArt(elements, side, scale = 2.5) {
   const list = elements[side].filter((e) => !e.hidden);
   if (!list.length) return null;
   let x0 = Infinity;
@@ -394,6 +573,6 @@ export function exportArt(elements, side, scale = 2) {
   c.width = Math.max(1, Math.ceil((x1 - x0) * ppu));
   c.height = Math.max(1, Math.ceil((y1 - y0) * ppu));
   const ctx = c.getContext('2d');
-  for (const el of list) drawElement(ctx, el, ppu, (x0 + 1.5) * ppu, (y0 + 1.5) * ppu);
+  for (const el of list) drawElement(ctx, el, ppu, -x0 * ppu, -y0 * ppu);
   return c;
 }

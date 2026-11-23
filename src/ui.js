@@ -1,7 +1,7 @@
-// Interfaz de usuario: paneles, capas, propiedades, carrito, pedidos, diseños guardados y exportación.
+// Interfaz de usuario: zonas, patrones, presets, capas, propiedades, carrito, pedidos y exportación.
 import { CONFIG, money } from './config.js';
 import {
-  state, on, emit, images, selected, addElement, removeElement, selectElement, duplicateElement, moveLayer, clearSide,
+  state, defaultProduct, on, emit, images, selected, addElement, removeElement, selectElement, duplicateElement, moveLayer, clearSide,
   commit, changed, undo, redo, canUndo, canRedo, priceInfo, registerImage, newId, serializeDesign, loadDesign, loadImage,
 } from './state.js';
 import { exportArt } from './render2d.js';
@@ -34,11 +34,11 @@ export function toast(msg, actionLabel, action) {
 }
 
 const lum = (hex) => {
-  const n = parseInt(hex.slice(1), 16);
+  const n = parseInt((hex || '#ffffff').slice(1), 16);
   const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
 };
-const contrastInk = (hex) => (lum(hex) > 0.55 ? '#16171c' : '#ffffff');
+const contrastInk = (hex) => (lum(hex) > 0.55 ? '#111827' : '#ffffff');
 
 function download(canvasOrBlob, name) {
   const go = (blob) => {
@@ -64,7 +64,6 @@ const shapeSvg = (t) => `<svg viewBox="0 0 24 24">${SHAPE_ICONS[t]}</svg>`;
 const SHAPE_GLYPH = { rect: '▭', circle: '●', triangle: '▲', star: '★', heart: '♥', bolt: '⚡' };
 
 export function initUI(viewer) {
-  const defaults = { color: CONFIG.colors[0].hex, neck: 'round', sleeve: 'short', fit: 'regular', size: 'M', qty: 1 };
   const stage = $('#stage');
 
   // ---------------- Pestañas ----------------
@@ -74,18 +73,119 @@ export function initUI(viewer) {
   }
   $$('.tab').forEach((t) => t.addEventListener('click', () => showTab(t.dataset.tab)));
 
-  // ---------------- Producto ----------------
+  // ---------------- Presets ----------------
+  const presetsGrid = $('#presets-grid');
+  CONFIG.presets.forEach((pr) => {
+    const z = pr.product.zones;
+    presetsGrid.append(
+      h('button', {
+        class: 'preset-card',
+        onclick: () => {
+          Object.assign(state.product, {
+            ...pr.product,
+            zones: { ...pr.product.zones },
+          });
+          if (pr.bg) setStageBg(pr.bg);
+          emit('product');
+          toast(`Estilo «${pr.name}» aplicado`);
+        },
+      },
+      h('div', { class: 'preset-swatch' },
+        h('span', { style: `background:${z.front}` }),
+        h('span', { style: `background:${pr.product.pattern !== 'solid' ? pr.product.patternColor : z.sleeveL}` }),
+        h('span', { style: `background:${z.collar}` }),
+      ),
+      h('small', { text: pr.name })),
+    );
+  });
+
+  // ---------------- Zonas y Colores ----------------
+  const segZone = $('#seg-zone');
+  CONFIG.zones.forEach((z) => {
+    segZone.append(h('button', {
+      'data-z': z.id,
+      text: z.label,
+      onclick: () => {
+        state.activeZone = z.id;
+        if (z.id === 'front') viewer.setView('front');
+        else if (z.id === 'back') viewer.setView('back');
+        else if (z.id === 'sleeves') viewer.setView('left');
+        renderProduct();
+      },
+    }));
+  });
+
+  function currentZoneColor() {
+    const p = state.product;
+    const z = p.zones;
+    switch (state.activeZone) {
+      case 'front': return z.front;
+      case 'back': return z.back;
+      case 'sleeves': return z.sleeveL;
+      case 'collar': return z.collar;
+      default: return p.color;
+    }
+  }
+
+  function applyZoneColor(hex) {
+    const p = state.product;
+    const z = p.zones;
+    switch (state.activeZone) {
+      case 'front': z.front = hex; break;
+      case 'back': z.back = hex; break;
+      case 'sleeves': z.sleeveL = hex; z.sleeveR = hex; break;
+      case 'collar': z.collar = hex; break;
+      default:
+        p.color = hex;
+        z.front = z.back = z.sleeveL = z.sleeveR = z.collar = hex;
+        break;
+    }
+    emit('product');
+  }
+
   const sw = $('#swatches');
   CONFIG.colors.forEach((c) => {
-    sw.append(h('button', { class: 'swatch', style: `background:${c.hex}`, title: c.name, 'data-hex': c.hex, 'aria-label': c.name, onclick: () => setProduct({ color: c.hex }) }));
+    sw.append(h('button', {
+      class: 'swatch', style: `background:${c.hex}`, title: c.name, 'data-hex': c.hex, 'aria-label': c.name,
+      onclick: () => applyZoneColor(c.hex),
+    }));
   });
-  const custom = h('input', { type: 'color', hidden: true, value: '#ff8800', oninput: (e) => setProduct({ color: e.target.value }) });
+  const custom = h('input', { type: 'color', hidden: true, value: '#2563eb', oninput: (e) => applyZoneColor(e.target.value) });
   sw.append(h('label', { class: 'swatch', title: 'Color personalizado', style: 'background:conic-gradient(red,yellow,lime,aqua,blue,magenta,red);cursor:pointer' }, custom));
 
+  // ---------------- Patrones (Spized) ----------------
+  const patternGrid = $('#pattern-grid');
+  CONFIG.patterns.forEach((pt) => {
+    patternGrid.append(h('button', {
+      class: 'pattern-btn',
+      'data-pat': pt.id,
+      text: pt.label,
+      onclick: () => {
+        state.product.pattern = pt.id;
+        emit('product');
+      },
+    }));
+  });
+
+  const patSw = $('#pattern-swatches');
+  CONFIG.colors.forEach((c) => {
+    patSw.append(h('button', {
+      class: 'swatch', style: `background:${c.hex}`, title: c.name, 'data-phex': c.hex, 'aria-label': c.name,
+      onclick: () => { state.product.patternColor = c.hex; emit('product'); },
+    }));
+  });
+  const customPat = h('input', { type: 'color', hidden: true, value: '#06b6d4', oninput: (e) => { state.product.patternColor = e.target.value; emit('product'); } });
+  patSw.append(h('label', { class: 'swatch', title: 'Color libre', style: 'background:conic-gradient(red,yellow,lime,aqua,blue,magenta,red);cursor:pointer' }, customPat));
+
+  $('#pattern-alpha').addEventListener('input', (e) => {
+    state.product.patternAlpha = +e.target.value;
+    $('#pattern-alpha-out').textContent = Math.round(state.product.patternAlpha * 100) + '%';
+    emit('product');
+  });
+
+  // ---------------- Ajuste y Tallas ----------------
   $('#sizes').append(...CONFIG.sizes.map((s) => h('button', { 'data-v': s, text: s, onclick: () => setProduct({ size: s }) })));
-  for (const key of ['neck', 'sleeve', 'fit']) {
-    $$(`#seg-${key} button`).forEach((b) => b.addEventListener('click', () => setProduct({ [key]: b.dataset.v })));
-  }
+  $$('#seg-fit button').forEach((b) => b.addEventListener('click', () => setProduct({ fit: b.dataset.v })));
   $('#tab-product .muted.small').textContent = $('#tab-product .muted.small').textContent.replace('{{min}}', CONFIG.prices.bulkMinQty);
 
   function setProduct(patch) {
@@ -95,16 +195,24 @@ export function initUI(viewer) {
 
   function renderProduct() {
     const p = state.product;
-    $$('.swatch[data-hex]').forEach((b) => b.classList.toggle('active', b.dataset.hex.toLowerCase() === p.color.toLowerCase()));
-    const known = CONFIG.colors.find((c) => c.hex.toLowerCase() === p.color.toLowerCase());
-    $('.swatch:not([data-hex])').classList.toggle('active', !known);
-    $('#color-name').textContent = known ? known.name : `Personalizado (${p.color})`;
-    for (const key of ['neck', 'sleeve', 'fit']) $$(`#seg-${key} button`).forEach((b) => b.classList.toggle('active', b.dataset.v === p[key]));
+    $$('#seg-zone button').forEach((b) => b.classList.toggle('active', b.dataset.z === state.activeZone));
+
+    const activeHex = (currentZoneColor() || p.color).toLowerCase();
+    $$('#swatches .swatch[data-hex]').forEach((b) => b.classList.toggle('active', b.dataset.hex.toLowerCase() === activeHex));
+    const known = CONFIG.colors.find((c) => c.hex.toLowerCase() === activeHex);
+    const zoneLabel = CONFIG.zones.find((z) => z.id === state.activeZone)?.label || 'Toda';
+    $('#color-name').textContent = `${zoneLabel}: ${known ? known.name : activeHex}`;
+
+    $$('#pattern-grid .pattern-btn').forEach((b) => b.classList.toggle('active', b.dataset.pat === p.pattern));
+    $('#pattern-controls').hidden = p.pattern === 'solid';
+    $$('#pattern-swatches .swatch[data-phex]').forEach((b) => b.classList.toggle('active', b.dataset.phex.toLowerCase() === (p.patternColor || '').toLowerCase()));
+    $('#pattern-alpha').value = p.patternAlpha ?? 0.85;
+    $('#pattern-alpha-out').textContent = Math.round((p.patternAlpha ?? 0.85) * 100) + '%';
+
+    $$('#seg-fit button').forEach((b) => b.classList.toggle('active', b.dataset.v === p.fit));
     $$('#sizes button').forEach((b) => b.classList.toggle('active', b.dataset.v === p.size));
     renderPrice();
-    renderSwatchDetails();
   }
-  function renderSwatchDetails() {}
 
   function renderPrice() {
     const info = priceInfo();
@@ -126,14 +234,41 @@ export function initUI(viewer) {
   // ---------------- Añadir ----------------
   $('#shape-grid').append(...CONFIG.shapes.map((s) => h('button', { title: s.label, html: shapeSvg(s.type) + `<span>${s.label}</span>`, onclick: () => addShape(s.type) })));
   $('#sticker-grid').append(...CONFIG.stickers.map((c) => h('button', { text: c, onclick: () => addElement({ type: 'emoji', char: c }) })));
+
   $('#btn-add-text').onclick = () => {
+    const baseHex = state.side === 'back' ? state.product.zones.back : state.product.zones.front;
     addElement({
-      type: 'text', text: 'Tu texto', font: 'Anton', color: contrastInk(state.product.color), strokeColor: '#000000',
-      strokeW: 0, curve: 0, spacing: 0, align: 'center',
+      type: 'text', text: 'TU TEXTO', font: 'Anton', color: contrastInk(baseHex), strokeColor: '#000000',
+      strokeW: 0, curve: 0, spacing: 2, align: 'center', y: -0.25, s: 1.2,
     });
   };
+
+  $('#btn-add-chest').onclick = () => {
+    viewer.setView('front');
+    addElement({
+      type: 'shape', shape: 'star', fill: '#facc15', stroke: '#0f172a', strokeW: 3, ratio: 1, radius: 0.15,
+      x: 0.36, y: -0.58, s: 0.55,
+    }, 'front');
+    toast('Escudo añadido en el pecho izquierdo');
+  };
+
+  $('#btn-add-dorsal').onclick = () => {
+    viewer.setView('back');
+    const ink = contrastInk(state.product.zones.back);
+    addElement({
+      type: 'text', text: 'DECERO', font: 'Bebas Neue', color: ink, strokeColor: '#000000',
+      strokeW: 0, curve: 0, spacing: 8, align: 'center', x: 0, y: -0.62, s: 1.35,
+    }, 'back');
+    addElement({
+      type: 'text', text: '10', font: 'Anton', color: ink, strokeColor: '#000000',
+      strokeW: 0, curve: 0, spacing: 2, align: 'center', x: 0, y: 0.05, s: 3.1,
+    }, 'back');
+    toast('Nombre y dorsal añadidos en la espalda');
+  };
+
   function addShape(type) {
-    const dark = lum(state.product.color) < 0.5;
+    const baseHex = state.side === 'back' ? state.product.zones.back : state.product.zones.front;
+    const dark = lum(baseHex) < 0.5;
     addElement({ type: 'shape', shape: type, fill: dark ? '#fbbf24' : '#e11d48', stroke: '#000000', strokeW: 0, ratio: 1, radius: 0.15 });
   }
 
@@ -156,7 +291,7 @@ export function initUI(viewer) {
       const src = file.type === 'image/jpeg' ? c.toDataURL('image/jpeg', 0.92) : c.toDataURL('image/png');
       const id = newId('img');
       await registerImage(id, src);
-      addElement({ type: 'image', imgId: id, name: file.name.replace(/\.[^.]+$/, '').slice(0, 24) });
+      addElement({ type: 'image', imgId: id, name: file.name.replace(/\.[^.]+$/, '').slice(0, 24), y: -0.25, s: 1.1 });
     } catch {
       toast('No se pudo leer la imagen');
     } finally {
@@ -219,7 +354,6 @@ export function initUI(viewer) {
     });
   }
 
-  // --- campos reutilizables ---
   const fld = (label, ...ctrl) => h('div', { class: 'field' }, h('span', { class: 'lbl' }, label), ...ctrl);
 
   function range(el, key, label, min, max, step, fmt = (v) => v) {
@@ -265,7 +399,7 @@ export function initUI(viewer) {
     propsEl.innerHTML = '';
     const el = selected();
     if (!el) {
-      propsEl.append(h('p', { class: 'muted small', text: 'Selecciona una capa, o toca un diseño sobre la camiseta, para editarlo. Arrastra sus esquinas para cambiar tamaño y rotación.' }));
+      propsEl.append(h('p', { class: 'muted small', text: 'Selecciona una capa, o toca un diseño sobre la camiseta 3D, para moverlo, escalarlo o rotarlo.' }));
       return;
     }
     const card = h('div', { class: 'prop-card' });
@@ -317,7 +451,7 @@ export function initUI(viewer) {
       if (el.shape === 'rect') card.append(range(el, 'radius', 'Esquinas redondeadas', 0, 1, 0.01, (v) => Math.round(v * 100) + '%'));
     }
 
-    card.append(range(el, 's', 'Tamaño', 0.1, 4, 0.01, (v) => Math.round(v * 100) + '%'));
+    card.append(range(el, 's', 'Tamaño', 0.1, 4.5, 0.01, (v) => Math.round(v * 100) + '%'));
     card.append(range(el, 'rot', 'Rotación', -180, 180, 1, (v) => v + '°'));
     card.append(range(el, 'opacity', 'Opacidad', 0.1, 1, 0.01, (v) => Math.round(v * 100) + '%'));
 
@@ -343,9 +477,35 @@ export function initUI(viewer) {
   on('side', renderLayers);
   $('#btn-clear-side').onclick = () => clearSide(state.side);
 
-  // ---------------- Barra del visor ----------------
-  $$('[data-view]').forEach((b) => b.addEventListener('click', () => viewer.setView(b.dataset.view)));
-  on('side', (s) => $$('[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === s)));
+  // ---------------- Barra del visor y fondos ----------------
+  function setStageBg(hex) {
+    state.bg = hex;
+    stage.style.setProperty('--stage-bg', hex);
+    $('#bg-color').value = hex;
+    $$('.bg-dot').forEach((d) => d.classList.toggle('active', d.dataset.bg.toLowerCase() === hex.toLowerCase()));
+  }
+
+  const bgDots = $('#bg-dots');
+  CONFIG.stageBgs.forEach((b) => {
+    bgDots.append(h('button', {
+      class: 'bg-dot',
+      'data-bg': b.hex,
+      title: b.name,
+      style: `background:${b.hex}`,
+      onclick: () => setStageBg(b.hex),
+    }));
+  });
+
+  $$('[data-view]').forEach((b) => b.addEventListener('click', () => {
+    viewer.setView(b.dataset.view);
+    $$('[data-view]').forEach((x) => x.classList.toggle('active', x === b));
+  }));
+  on('side', (s) => {
+    const curActive = $('[data-view].active')?.dataset.view;
+    if (curActive === 'front' || curActive === 'back') {
+      $$('[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === s));
+    }
+  });
   $('#btn-rotate').onclick = (e) => {
     viewer.setAutoRotate(!viewer.autoRotate);
     e.currentTarget.classList.toggle('active', viewer.autoRotate);
@@ -355,11 +515,8 @@ export function initUI(viewer) {
     e.currentTarget.classList.toggle('active', state.guides);
     emit('design');
   };
-  $('#bg-color').oninput = (e) => {
-    state.bg = e.target.value;
-    stage.style.setProperty('--stage-bg', state.bg);
-  };
-  stage.style.setProperty('--stage-bg', state.bg);
+  $('#bg-color').oninput = (e) => setStageBg(e.target.value);
+  setStageBg(state.bg);
   setTimeout(() => $('#stage-hint').classList.add('fade'), 9000);
 
   // ---------------- Historial ----------------
@@ -401,8 +558,10 @@ export function initUI(viewer) {
   const dlgCart = $('#dlg-cart');
   const saveCart = () => kvSet('cart', cart);
   const cartTotal = () => cart.reduce((a, i) => a + i.total, 0);
-  const describe = (p) =>
-    `${CONFIG.colors.find((c) => c.hex.toLowerCase() === p.color.toLowerCase())?.name || p.color} · talla ${p.size} · cuello ${p.neck === 'v' ? 'en V' : 'redondo'} · manga ${p.sleeve === 'long' ? 'larga' : 'corta'} · ${p.fit === 'oversize' ? 'oversize' : 'regular'}`;
+  const describe = (p) => {
+    const pat = CONFIG.patterns.find((x) => x.id === p.pattern)?.label || 'Liso';
+    return `Talla ${p.size} · ${p.fit === 'oversize' ? 'Oversize' : 'Regular'} · Patrón ${pat}`;
+  };
 
   function renderCart() {
     $('#cart-count').textContent = cart.reduce((a, i) => a + i.qty, 0);
@@ -418,7 +577,7 @@ export function initUI(viewer) {
       const row = h('div', { class: 'cart-item' },
         h('div', { class: 'cart-thumbs' }, h('img', { src: it.thumbFront, alt: 'Frente' }), it.thumbBack && h('img', { src: it.thumbBack, alt: 'Espalda' })),
         h('div', { class: 'cart-info' },
-          h('b', { text: 'Camisa personalizada' }),
+          h('b', { text: 'Camisa personalizada Pro' }),
           h('div', { class: 'meta', text: describe(it.design.product) + ` · estampado: ${it.sides.length === 2 ? 'frente y espalda' : it.sides[0] === 'front' ? 'frente' : it.sides[0] === 'back' ? 'espalda' : 'ninguno'}` }),
           h('div', { class: 'row' },
             h('div', { class: 'qty' },
@@ -438,7 +597,10 @@ export function initUI(viewer) {
     const P = CONFIG.prices;
     const p = design.product;
     const sides = ['front', 'back'].filter((s) => design.elements[s].some((e) => !e.hidden));
-    return { sides, unit: P.base + (p.sleeve === 'long' ? P.longSleeve : 0) + (p.fit === 'oversize' ? P.oversize : 0) + P.printSide * sides.length };
+    return {
+      sides,
+      unit: P.base + (p.pattern && p.pattern !== 'solid' ? P.pattern : 0) + (p.fit === 'oversize' ? P.oversize : 0) + P.printSide * sides.length,
+    };
   }
   function itemTotal(unit, qty) {
     const P = CONFIG.prices;
@@ -466,9 +628,9 @@ export function initUI(viewer) {
     try {
       const design = serializeDesign();
       const { sides, unit } = unitFor(design);
-      const jpg = (c) => c.toDataURL('image/jpeg', 0.85);
-      const thumbFront = jpg(viewer.capture('front', 360));
-      const thumbBack = sides.includes('back') ? jpg(viewer.capture('back', 360)) : null;
+      const jpg = (c) => c.toDataURL('image/jpeg', 0.88);
+      const thumbFront = jpg(viewer.capture('front', 400));
+      const thumbBack = sides.includes('back') ? jpg(viewer.capture('back', 400)) : null;
       const qty = state.product.qty;
       cart.push({ id: newId('c'), createdAt: Date.now(), design, sides, unit, qty, total: itemTotal(unit, qty), thumbFront, thumbBack });
       await saveCart();
@@ -535,7 +697,7 @@ export function initUI(viewer) {
     const input = $('#design-name');
     const list = await kvGet('designs', []);
     const hasBack = state.elements.back.length && !state.elements.front.length;
-    const thumb = viewer.capture(hasBack ? 'back' : 'front', 320).toDataURL('image/jpeg', 0.8);
+    const thumb = viewer.capture(hasBack ? 'back' : 'front', 360).toDataURL('image/jpeg', 0.85);
     list.unshift({ id: newId('d'), name: input.value.trim(), date: Date.now(), thumb, design: serializeDesign() });
     await kvSet('designs', list);
     input.value = '';
@@ -544,7 +706,7 @@ export function initUI(viewer) {
   });
   $('#btn-new').onclick = async () => {
     if (!confirm('¿Empezar un diseño nuevo? Se borrará el diseño actual (los guardados no se tocan).')) return;
-    await loadDesign({ product: { ...defaults }, elements: { front: [], back: [] }, images: {} });
+    await loadDesign({ product: defaultProduct(), elements: { front: [], back: [] }, images: {} });
     dlgDesigns.close();
   };
 
@@ -554,9 +716,9 @@ export function initUI(viewer) {
   $$('[data-export]').forEach((b) => b.addEventListener('click', () => {
     const [kind, side] = b.dataset.export.split('-');
     const label = side === 'front' ? 'frente' : 'espalda';
-    if (kind === 'mock') download(viewer.capture(side, 1600), `camisa-${label}.png`);
+    if (kind === 'mock') download(viewer.capture(side, 1600), `decero-${label}.png`);
     else {
-      const c = exportArt(state.elements, side, 2);
+      const c = exportArt(state.elements, side, 2.5);
       if (!c) return toast(`No hay diseños en ${label}`);
       download(c, `arte-${label}.png`);
     }

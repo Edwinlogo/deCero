@@ -1,182 +1,215 @@
-// Escena 3D: camiseta, iluminación, cámara orbital y edición directa sobre el modelo.
+// Escena 3D fotorrealista: modelo GLB real, PBR textil, iluminación HDR de estudio y edición directa.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { buildShirtGeometries, HEM_Y } from './shirt3d.js';
-import { SIZE, paintSide, hitHandle, hitElement } from './render2d.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { ATLAS_SIZE, paintAtlas, uvToDesign, hitHandle, hitElement } from './render2d.js';
 import { state, on, emit, selected, selectElement, removeElement, commit, changed } from './state.js';
 
-function fabricBumpTexture() {
+function createSoftShadowTexture() {
   const c = document.createElement('canvas');
   c.width = c.height = 256;
   const ctx = c.getContext('2d');
-  const img = ctx.createImageData(256, 256);
-  for (let y = 0; y < 256; y++) {
-    for (let x = 0; x < 256; x++) {
-      const weave = ((x >> 1) + (y >> 1)) % 2 ? 22 : -22;
-      const v = 128 + weave + (Math.random() - 0.5) * 40;
-      const i = (y * 256 + x) * 4;
-      img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
-      img.data[i + 3] = 255;
-    }
-  }
-  ctx.putImageData(img, 0, 0);
+  const g = ctx.createRadialGradient(128, 128, 10, 128, 128, 124);
+  g.addColorStop(0, 'rgba(15, 23, 42, 0.28)');
+  g.addColorStop(0.55, 'rgba(15, 23, 42, 0.11)');
+  g.addColorStop(1, 'rgba(15, 23, 42, 0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 256, 256);
   const t = new THREE.CanvasTexture(c);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.repeat.set(12, 12);
   return t;
 }
 
 export function createViewer(container) {
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+  const renderer = new THREE.WebGLRenderer({
+    antialias: true,
+    alpha: true,
+    powerPreference: 'high-performance',
+    preserveDrawingBuffer: true,
+  });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.NeutralToneMapping;
-  renderer.toneMappingExposure = 1.0;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.04;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
+
   const canvas = renderer.domElement;
   canvas.style.touchAction = 'none';
   container.appendChild(canvas);
 
   const scene = new THREE.Scene();
+
+  // Entorno HDRI de estudio fotográfico
   const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-  scene.environmentIntensity = 0.55;
+  const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  scene.environment = envTex;
+  scene.environmentIntensity = 0.48;
 
-  const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 60);
-  camera.position.set(0, 0.1, 8);
+  const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 60);
+  camera.position.set(0, 0.05, 6.2);
 
-  const key = new THREE.DirectionalLight(0xffffff, 1.6);
-  key.position.set(2.2, 7, 5);
+  // Iluminación de estudio de 3 puntos (Key + Fill + Rim)
+  const key = new THREE.DirectionalLight(0xfffaf2, 1.55);
+  key.position.set(1.2, 6.2, 4.4);
   key.castShadow = true;
   key.shadow.mapSize.set(2048, 2048);
-  key.shadow.camera.left = -3;
-  key.shadow.camera.right = 3;
-  key.shadow.camera.top = 3;
-  key.shadow.camera.bottom = -3;
-  key.shadow.bias = -0.0004;
+  key.shadow.camera.left = -2.2;
+  key.shadow.camera.right = 2.2;
+  key.shadow.camera.top = 2.2;
+  key.shadow.camera.bottom = -2.2;
+  key.shadow.bias = -0.0005;
   key.shadow.normalBias = 0.02;
   scene.add(key);
-  const fill = new THREE.DirectionalLight(0xdfe8ff, 0.5);
-  fill.position.set(-4, 2, -5);
+
+  const fill = new THREE.DirectionalLight(0xdbeafe, 0.55);
+  fill.position.set(-4.2, 2.0, 2.5);
   scene.add(fill);
 
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(14, 14), new THREE.ShadowMaterial({ opacity: 0.16 }));
-  ground.rotation.x = -Math.PI / 2;
-  ground.position.y = HEM_Y - 0.25;
-  ground.receiveShadow = true;
-  scene.add(ground);
+  const rim = new THREE.DirectionalLight(0xffffff, 0.85);
+  rim.position.set(0.5, 3.2, -5.0);
+  scene.add(rim);
 
-  // ---------- Texturas (una por lado) ----------
+  // Sombra de contacto suave + ShadowMaterial en el suelo
+  const contactShadow = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.3, 1.25),
+    new THREE.MeshBasicMaterial({ map: createSoftShadowTexture(), transparent: true, depthWrite: false }),
+  );
+  contactShadow.rotation.x = -Math.PI / 2;
+  contactShadow.position.y = -1.44;
+  scene.add(contactShadow);
+
+  const shadowFloor = new THREE.Mesh(
+    new THREE.PlaneGeometry(10, 10),
+    new THREE.ShadowMaterial({ opacity: 0.055 }),
+  );
+  shadowFloor.rotation.x = -Math.PI / 2;
+  shadowFloor.position.y = -1.45;
+  shadowFloor.receiveShadow = true;
+  scene.add(shadowFloor);
+
+  // ---------- Atlas dinámico 2048x2048 ----------
   const maxAniso = renderer.capabilities.getMaxAnisotropy();
-  const sides = {};
-  for (const side of ['front', 'back']) {
-    const cv = document.createElement('canvas');
-    cv.width = cv.height = SIZE;
-    const tex = new THREE.CanvasTexture(cv);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.anisotropy = maxAniso;
-    sides[side] = { cv, ctx: cv.getContext('2d'), tex };
-  }
-  const bump = fabricBumpTexture();
-  const common = {
-    roughness: 0.92,
-    metalness: 0,
-    sheen: 0.7,
-    sheenRoughness: 0.55,
-    sheenColor: new THREE.Color(0x6a6a6a),
-    bumpMap: bump,
-    bumpScale: 1.4,
-    side: THREE.DoubleSide,
-  };
-  const panelMat = {
-    front: new THREE.MeshPhysicalMaterial({ ...common, map: sides.front.tex, alphaTest: 0.5 }),
-    back: new THREE.MeshPhysicalMaterial({ ...common, map: sides.back.tex, alphaTest: 0.5 }),
-  };
-  const solidMat = new THREE.MeshPhysicalMaterial({ ...common, color: new THREE.Color(state.product.color) });
-  const capMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 1, side: THREE.DoubleSide });
+  const atlasCv = document.createElement('canvas');
+  atlasCv.width = atlasCv.height = ATLAS_SIZE;
+  const atlasCtx = atlasCv.getContext('2d');
 
-  // ---------- Camiseta ----------
-  const shirt = new THREE.Group();
-  scene.add(shirt);
-  let meshes = {};
-  let geoKey = '';
+  const atlasTex = new THREE.CanvasTexture(atlasCv);
+  atlasTex.flipY = false; // glTF usa v=0 arriba
+  atlasTex.colorSpace = THREE.SRGBColorSpace;
+  atlasTex.anisotropy = maxAniso;
 
-  function rebuild() {
-    const { neck, sleeve, fit } = state.product;
-    const k = `${neck}|${sleeve}|${fit}`;
-    if (k === geoKey) return;
-    geoKey = k;
-    shirt.children.slice().forEach((m) => {
-      shirt.remove(m);
-      m.geometry?.dispose();
-    });
-    const g = buildShirtGeometries({ neck, sleeve, fit });
-    const front = new THREE.Mesh(g.front, panelMat.front);
-    const back = new THREE.Mesh(g.back, panelMat.back);
-    const collar = new THREE.Mesh(g.collar, solidMat);
-    const sR = new THREE.Mesh(g.sleeve, solidMat);
-    const sL = new THREE.Mesh(g.sleeve.clone(), solidMat);
-    sL.scale.x = -1;
-    const cR = new THREE.Mesh(g.cap, capMat);
-    const cL = new THREE.Mesh(g.cap.clone(), capMat);
-    cL.scale.x = -1;
-    for (const m of [front, back, collar, sR, sL]) {
-      m.castShadow = true;
-      m.receiveShadow = true;
-    }
-    shirt.add(front, back, collar, sR, sL, cR, cL);
-    meshes = { front, back };
-  }
+  // ---------- Grupo de la camiseta GLB ----------
+  const shirtGroup = new THREE.Group();
+  scene.add(shirtGroup);
+  let shirtMesh = null;
+  let baseScale = 1;
+  let targetScaleVec = new THREE.Vector3(1, 1, 1);
+
+  let readyResolve;
+  const ready = new Promise((r) => (readyResolve = r));
+
+  const loader = new GLTFLoader();
+  loader.load(
+    '/models/shirt_baked.glb',
+    (gltf) => {
+      const root = gltf.scene;
+      // Normalizar escala y centrar geometría
+      const box = new THREE.Box3().setFromObject(root);
+      const size = new THREE.Vector3();
+      const center = new THREE.Vector3();
+      box.getSize(size);
+      box.getCenter(center);
+
+      const desiredHeight = 2.65;
+      baseScale = desiredHeight / size.y;
+
+      root.traverse((obj) => {
+        if (!obj.isMesh) return;
+        shirtMesh = obj;
+
+        // Asegurar uv1 para que aoMap use las mismas coordenadas UV0 del GLB
+        if (obj.geometry.attributes.uv && !obj.geometry.attributes.uv1) {
+          obj.geometry.setAttribute('uv1', obj.geometry.attributes.uv);
+        }
+
+        const orig = obj.material;
+        const normalMap = orig?.normalMap || null;
+        const aoMap = orig?.aoMap || null;
+        if (normalMap) {
+          normalMap.anisotropy = maxAniso;
+        }
+
+        obj.material = new THREE.MeshPhysicalMaterial({
+          map: atlasTex,
+          normalMap,
+          normalScale: new THREE.Vector2(1.15, 1.15),
+          aoMap,
+          aoMapIntensity: 0.95,
+          roughness: 0.88,
+          metalness: 0.0,
+          sheen: 0.16,
+          sheenRoughness: 0.82,
+          sheenColor: new THREE.Color(0xdbe4f0),
+          side: THREE.DoubleSide,
+        });
+
+        obj.castShadow = true;
+        obj.receiveShadow = true;
+      });
+
+      root.position.set(-center.x * baseScale, -center.y * baseScale + 0.04, -center.z * baseScale);
+      root.scale.setScalar(baseScale);
+      shirtGroup.add(root);
+
+      applyProduct();
+      dirty = true;
+      flush();
+      readyResolve();
+    },
+    undefined,
+    (err) => {
+      console.error('Error cargando modelo 3D:', err);
+      readyResolve();
+    },
+  );
 
   function applyProduct() {
-    const c = new THREE.Color(state.product.color);
-    solidMat.color.copy(c);
-    capMat.color.copy(c).multiplyScalar(0.22);
-    rebuild();
+    const oversize = state.product.fit === 'oversize';
+    targetScaleVec.set(oversize ? 1.07 : 1, oversize ? 1.03 : 1, oversize ? 1.08 : 1);
   }
 
-  // ---------- Pintado de texturas ----------
-  const dirty = { front: true, back: true };
+  // ---------- Pintado de textura ----------
+  let dirty = true;
   let paintGuides = true;
-  function paintAll(guides = true) {
-    for (const side of ['front', 'back']) {
-      paintSide(sides[side].ctx, side, {
-        elements: state.elements,
-        product: state.product,
-        guides: guides && state.guides,
-        selectedId: state.selectedId,
-      });
-      sides[side].tex.needsUpdate = true;
-      dirty[side] = false;
-    }
+
+  function paintNow(guides = true) {
+    paintAtlas(atlasCtx, {
+      elements: state.elements,
+      product: state.product,
+      guides: guides && state.guides,
+      selectedId: state.selectedId,
+    });
+    atlasTex.needsUpdate = true;
+    dirty = false;
   }
+
   function flush() {
-    for (const side of ['front', 'back']) {
-      if (!dirty[side]) continue;
-      paintSide(sides[side].ctx, side, {
-        elements: state.elements,
-        product: state.product,
-        guides: paintGuides && state.guides,
-        selectedId: state.selectedId,
-      });
-      sides[side].tex.needsUpdate = true;
-      dirty[side] = false;
-    }
+    if (!dirty) return;
+    paintNow(paintGuides);
   }
-  on('design', (side) => {
-    if (side) dirty[side] = true;
-    else dirty.front = dirty.back = true;
+
+  on('design', () => {
+    dirty = true;
   });
   on('product', () => {
     applyProduct();
-    dirty.front = dirty.back = true;
+    dirty = true;
   });
 
   // ---------- Cámara ----------
   const controls = { obj: null };
-  let fitDist = 8;
+  let fitDist = 6.2;
   const tmpSph = new THREE.Spherical();
 
   function resize() {
@@ -188,33 +221,30 @@ export function createViewer(container) {
     camera.updateProjectionMatrix();
     const t = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
     const old = fitDist;
-    fitDist = Math.max(3.7 / t, 4.1 / (t * camera.aspect));
+    fitDist = Math.max(3.35 / t, 3.25 / (t * camera.aspect));
     if (controls.obj) {
-      controls.obj.minDistance = fitDist * 0.3;
-      controls.obj.maxDistance = fitDist * 1.8;
-      // mantener el zoom relativo si ya existía
+      controls.obj.minDistance = fitDist * 0.38;
+      controls.obj.maxDistance = fitDist * 1.75;
       const ratio = fitDist / old;
-      if (old !== 8 && isFinite(ratio)) {
+      if (old !== 6.2 && isFinite(ratio)) {
         camera.position.multiplyScalar(ratio);
       }
     }
   }
   new ResizeObserver(resize).observe(container);
 
-  // ---------- Interacción ----------
+  // ---------- Interacción directa 3D (Raycasting UV) ----------
   const ray = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
-  function pick(e, only) {
+
+  function pick(e, forceSide = null) {
+    if (!shirtMesh) return null;
     const r = canvas.getBoundingClientRect();
     ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     ray.setFromCamera(ndc, camera);
-    const targets = only ? [meshes[only]] : [meshes.front, meshes.back];
-    const hit = ray.intersectObjects(targets, false)[0];
+    const hit = ray.intersectObject(shirtMesh, false)[0];
     if (!hit || !hit.uv) return null;
-    return {
-      side: hit.object === meshes.front ? 'front' : 'back',
-      pt: { x: hit.uv.x * 3 - 1.5, y: 1.5 - hit.uv.y * 3 },
-    };
+    return uvToDesign(hit.uv.x, hit.uv.y, forceSide);
   }
 
   let drag = null;
@@ -228,7 +258,7 @@ export function createViewer(container) {
   canvas.addEventListener('pointerdown', (e) => {
     pointers++;
     if (pointers > 1) {
-      if (drag) endDrag(e);
+      if (drag) endDrag();
       return;
     }
     if (!state.guides || (e.pointerType === 'mouse' && e.button !== 0)) return;
@@ -294,11 +324,11 @@ export function createViewer(container) {
       if (!hit) return;
       const { pt } = hit;
       if (drag.mode === 'move') {
-        el.x = Math.max(-1.4, Math.min(1.4, pt.x + drag.off.x));
-        el.y = Math.max(-1.4, Math.min(1.4, pt.y + drag.off.y));
+        el.x = Math.max(-1.2, Math.min(1.2, pt.x + drag.off.x));
+        el.y = Math.max(-1.35, Math.min(1.35, pt.y + drag.off.y));
       } else if (drag.mode === 'scale') {
         const d = Math.hypot(pt.x - el.x, pt.y - el.y);
-        el.s = Math.max(0.05, Math.min(10, drag.s0 * (d / drag.d0)));
+        el.s = Math.max(0.08, Math.min(8, drag.s0 * (d / drag.d0)));
       } else if (drag.mode === 'rotate') {
         const a = Math.atan2(pt.y - el.y, pt.x - el.x);
         let r = drag.rot0 + ((a - drag.a0) * 180) / Math.PI;
@@ -334,7 +364,7 @@ export function createViewer(container) {
   const release = (e) => {
     pointers = Math.max(0, pointers - 1);
     if (drag) {
-      endDrag(e);
+      endDrag();
       emit('layers');
     } else if (tap && !tap.moved && e.type === 'pointerup' && pointers === 0 && state.guides) {
       if (state.selectedId) selectElement(null);
@@ -347,25 +377,32 @@ export function createViewer(container) {
   const orbit = new OrbitControls(camera, canvas);
   controls.obj = orbit;
   orbit.enableDamping = true;
-  orbit.dampingFactor = 0.08;
+  orbit.dampingFactor = 0.075;
   orbit.enablePan = false;
-  orbit.rotateSpeed = 0.9;
-  orbit.autoRotateSpeed = 3;
-  orbit.minPolarAngle = Math.PI * 0.12;
-  orbit.maxPolarAngle = Math.PI * 0.88;
+  orbit.rotateSpeed = 0.85;
+  orbit.autoRotateSpeed = 2.6;
+  orbit.minPolarAngle = Math.PI * 0.14;
+  orbit.maxPolarAngle = Math.PI * 0.86;
   orbit.target.set(0, 0, 0);
 
-  // ---------- Vistas ----------
+  // ---------- Vistas cinemáticas ----------
+  const VIEW_ANGLES = {
+    front: { az: 0, polar: Math.PI / 2 - 0.03, rMul: 1 },
+    back: { az: Math.PI, polar: Math.PI / 2 - 0.03, rMul: 1 },
+    left: { az: Math.PI / 2, polar: Math.PI / 2 - 0.02, rMul: 0.96 },
+    right: { az: -Math.PI / 2, polar: Math.PI / 2 - 0.02, rMul: 0.96 },
+  };
+
   let tween = null;
-  function setView(side, animate = true) {
-    const az = side === 'back' ? Math.PI : 0;
+  function setView(viewName, animate = true) {
+    const cfg = VIEW_ANGLES[viewName] || VIEW_ANGLES.front;
     const off = camera.position.clone().sub(orbit.target);
     tmpSph.setFromVector3(off);
     const from = { az: tmpSph.theta, polar: tmpSph.phi, r: tmpSph.radius };
-    let toAz = az;
+    let toAz = cfg.az;
     while (toAz - from.az > Math.PI) toAz -= Math.PI * 2;
     while (toAz - from.az < -Math.PI) toAz += Math.PI * 2;
-    const to = { az: toAz, polar: Math.PI / 2 - 0.04, r: fitDist };
+    const to = { az: toAz, polar: cfg.polar, r: fitDist * cfg.rMul };
     if (!animate) {
       tween = null;
       tmpSph.set(to.r, to.polar, to.az);
@@ -375,9 +412,10 @@ export function createViewer(container) {
     }
     tween = { from, to, t: 0 };
   }
+
   function stepTween(dt) {
     if (!tween) return;
-    tween.t = Math.min(1, tween.t + dt / 0.7);
+    tween.t = Math.min(1, tween.t + dt / 0.65);
     const k = 1 - Math.pow(1 - tween.t, 3);
     const { from, to } = tween;
     tmpSph.set(
@@ -396,13 +434,15 @@ export function createViewer(container) {
     orbit.autoRotate = v;
   }
 
-  // ---------- Bucle ----------
+  // ---------- Bucle de animación ----------
   let lastT = performance.now();
   renderer.setAnimationLoop((now) => {
     const dt = Math.min(((now ?? performance.now()) - lastT) / 1000, 0.05);
     lastT = now ?? performance.now();
     stepTween(dt);
+    shirtGroup.scale.lerp(targetScaleVec, Math.min(1, dt * 10));
     orbit.update();
+
     const az = orbit.getAzimuthalAngle();
     const side = Math.abs(az) < Math.PI / 2 ? 'front' : 'back';
     if (side !== state.side) {
@@ -413,12 +453,12 @@ export function createViewer(container) {
     renderer.render(scene, camera);
   });
 
-  // ---------- Capturas ----------
-  function capture(side = 'front', size = 900, transparent = false) {
+  // ---------- Capturas HD ----------
+  function capture(side = 'front', size = 1000, transparent = false) {
     paintGuides = false;
-    paintAll(false);
+    paintNow(false);
     const cam = new THREE.PerspectiveCamera(camera.fov, 1, 0.1, 60);
-    cam.position.set(0, 0.05, side === 'front' ? 8.2 : -8.2);
+    cam.position.set(0, 0.06, side === 'front' ? 6.4 : -6.4);
     cam.lookAt(0, 0, 0);
     renderer.setPixelRatio(1);
     renderer.setSize(size, size, false);
@@ -432,7 +472,7 @@ export function createViewer(container) {
     }
     ctx.drawImage(canvas, 0, 0, size, size);
     paintGuides = true;
-    dirty.front = dirty.back = true;
+    dirty = true;
     resize();
     return out;
   }
@@ -441,5 +481,5 @@ export function createViewer(container) {
   resize();
   setView('front', false);
 
-  return { capture, setView, setAutoRotate, resize, get autoRotate() { return autoRotate; } };
+  return { ready, capture, setView, setAutoRotate, resize, get autoRotate() { return autoRotate; } };
 }

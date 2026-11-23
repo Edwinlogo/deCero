@@ -3,18 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#4f46e5" />
-    <meta name="description" content="Diseña tu camisa personalizada en 3D: sube imágenes, añade texto, elige color y pídela." />
+    <meta name="theme-color" content="#111827" />
+    <meta name="description" content="deCero 3D · Configurador 3D profesional de camisas personalizadas con zonas, patrones, imágenes y textos en tiempo real." />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <title>Estampa3D · Camisas personalizadas en 3D</title>
+    <title>deCero · Configurador 3D de Camisas</title>
   </head>
   <body>
     <div id="app">
       <header class="topbar">
         <div class="brand">
-          <img src="/favicon.svg" alt="" width="30" height="30" />
-          <span>Estampa<b>3D</b></span>
+          <div class="brand-mark">dC</div>
+          <span>deCero<b>3D</b></span>
+          <span class="brand-tag hide-sm">Studio</span>
         </div>
         <div class="top-actions">
           <button class="icon-btn" id="btn-undo" title="Deshacer (Ctrl+Z)" disabled>↶</button>
@@ -32,67 +33,87 @@
           <div class="stage-toolbar">
             <button class="chip active" data-view="front">Frente</button>
             <button class="chip" data-view="back">Espalda</button>
+            <button class="chip hide-xs" data-view="left">Izq</button>
+            <button class="chip hide-xs" data-view="right">Der</button>
+            <span class="chip-sep"></span>
             <button class="chip" id="btn-rotate">360°</button>
             <button class="chip active" id="btn-guides" title="Mostrar guías de edición">Guías</button>
-            <label class="chip bg-chip" title="Color de fondo">
-              Fondo <input type="color" id="bg-color" value="#e8ecf3" />
+            <div class="bg-dots" id="bg-dots" title="Ambiente de estudio"></div>
+            <label class="chip bg-chip" title="Color de fondo libre">
+              <input type="color" id="bg-color" value="#eceff4" />
             </label>
           </div>
-          <div class="stage-hint" id="stage-hint">Arrastra para girar · Rueda o pellizco para zoom · Toca un diseño para editarlo</div>
+          <div class="stage-hint" id="stage-hint">Arrastra para girar 360° · Zoom con rueda o pellizco · Toca un diseño sobre la camisa para moverlo</div>
           <div class="drop-overlay" id="drop-overlay">Suelta tu imagen aquí</div>
-          <div class="loading" id="loading"><div class="spinner"></div>Cargando visor 3D…</div>
+          <div class="loading" id="loading"><div class="spinner"></div>Cargando modelo 3D…</div>
           <div class="offline-pill" id="offline-pill" hidden>Sin conexión · tu trabajo se guarda en el dispositivo</div>
         </section>
 
         <aside class="panel">
           <nav class="tabs" id="tabs">
-            <button class="tab active" data-tab="product">Producto</button>
+            <button class="tab active" data-tab="product">Prenda</button>
+            <button class="tab" data-tab="pattern">Patrón</button>
             <button class="tab" data-tab="add">Añadir</button>
-            <button class="tab" data-tab="edit">Editar</button>
+            <button class="tab" data-tab="edit">Capas</button>
           </nav>
 
           <div class="tab-pages">
-            <!-- PRODUCTO -->
+            <!-- PRENDA Y ZONAS -->
             <section class="page active" id="tab-product">
-              <h3>Color</h3>
+              <h3>Estilos rápidos</h3>
+              <div class="presets-grid" id="presets-grid"></div>
+
+              <h3>Zona de color</h3>
+              <div class="seg" id="seg-zone"></div>
               <div class="swatches" id="swatches"></div>
               <div class="color-name" id="color-name"></div>
 
-              <h3>Cuello</h3>
-              <div class="seg" id="seg-neck">
-                <button data-v="round">Redondo</button>
-                <button data-v="v">En V</button>
-              </div>
-              <h3>Manga</h3>
-              <div class="seg" id="seg-sleeve">
-                <button data-v="short">Corta</button>
-                <button data-v="long">Larga</button>
-              </div>
               <h3>Ajuste</h3>
               <div class="seg" id="seg-fit">
-                <button data-v="regular">Regular</button>
+                <button data-v="regular">Regular Fit</button>
                 <button data-v="oversize">Oversize</button>
               </div>
+
               <h3>Talla</h3>
               <div class="sizes" id="sizes"></div>
 
               <h3>Resumen de precio</h3>
               <ul class="price-lines" id="price-lines"></ul>
-              <p class="muted small">Estampado en vinilo textil de alta resolución. Pedidos desde {{min}} unidades tienen descuento.</p>
+              <p class="muted small">Impresión DTF / Sublimación HD. Pedidos desde {{min}} unidades tienen descuento automático.</p>
+            </section>
+
+            <!-- PATRONES SUBLIMADOS (SPIZED) -->
+            <section class="page" id="tab-pattern">
+              <h3>Diseño de tela / Sublimación</h3>
+              <div class="pattern-grid" id="pattern-grid"></div>
+
+              <div id="pattern-controls">
+                <h3>Color del patrón</h3>
+                <div class="swatches" id="pattern-swatches"></div>
+
+                <label class="field" style="margin-top: 14px">
+                  <span class="lbl">Intensidad <output id="pattern-alpha-out">85%</output></span>
+                  <input type="range" id="pattern-alpha" min="0.1" max="1" step="0.05" value="0.85" />
+                </label>
+              </div>
             </section>
 
             <!-- AÑADIR -->
             <section class="page" id="tab-add">
-              <h3>Imagen</h3>
+              <h3>Imagen o Logo</h3>
               <label class="dropzone" id="dropzone">
                 <input type="file" id="file-input" accept="image/*" hidden />
                 <span class="dz-icon">🖼️</span>
-                <b>Subir imagen</b>
-                <small>PNG, JPG, SVG o WebP · también puedes arrastrar o pegar (Ctrl+V)</small>
+                <b>Subir imagen o logo</b>
+                <small>PNG transparente, SVG, JPG o WebP · arrastra o pega (Ctrl+V)</small>
               </label>
 
-              <h3>Texto</h3>
-              <button class="btn wide" id="btn-add-text">＋ Añadir texto</button>
+              <h3>Accesos rápidos</h3>
+              <div class="quick-adds">
+                <button class="btn" id="btn-add-text">＋ Texto</button>
+                <button class="btn" id="btn-add-chest">🛡️ Escudo pecho</button>
+                <button class="btn" id="btn-add-dorsal">👕 Dorsal espalda</button>
+              </div>
 
               <h3>Formas</h3>
               <div class="grid shapes" id="shape-grid"></div>
@@ -101,7 +122,7 @@
               <div class="grid stickers" id="sticker-grid"></div>
             </section>
 
-            <!-- EDITAR -->
+            <!-- EDITAR CAPAS -->
             <section class="page" id="tab-edit">
               <div class="row between">
                 <h3 class="inline">Capas · <span id="side-label">Frente</span></h3>
@@ -122,7 +143,7 @@
               <span id="qty-val">1</span>
               <button id="qty-plus" aria-label="Más">＋</button>
             </div>
-            <button class="btn primary big" id="btn-add-cart">Añadir al carrito</button>
+            <button class="btn primary big" id="btn-add-cart">Añadir</button>
           </footer>
         </aside>
       </main>
@@ -156,7 +177,7 @@
       <div class="dlg-body">
         <form id="save-form" class="row gap">
           <input id="design-name" placeholder="Nombre del diseño" maxlength="40" required />
-          <button class="btn primary" type="submit">Guardar actual</button>
+          <button class="btn primary" type="submit">Guardar</button>
         </form>
         <div class="designs-grid" id="designs-grid"></div>
         <button class="btn ghost wide" id="btn-new">Empezar un diseño nuevo</button>
@@ -167,8 +188,8 @@
     <dialog id="dlg-export" class="modal small">
       <div class="dlg-head"><h2>Exportar</h2><button class="icon-btn close" data-close>✕</button></div>
       <div class="dlg-body export-list">
-        <button class="btn wide" data-export="mock-front">📷 Mockup frente (PNG)</button>
-        <button class="btn wide" data-export="mock-back">📷 Mockup espalda (PNG)</button>
+        <button class="btn wide" data-export="mock-front">📷 Mockup frente HD (PNG)</button>
+        <button class="btn wide" data-export="mock-back">📷 Mockup espalda HD (PNG)</button>
         <button class="btn wide" data-export="art-front">🎨 Arte para impresión · frente (PNG transparente)</button>
         <button class="btn wide" data-export="art-back">🎨 Arte para impresión · espalda (PNG transparente)</button>
       </div>

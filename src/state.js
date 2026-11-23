@@ -7,13 +7,28 @@ export const on = (ev, fn) => {
 };
 export const emit = (ev, ...args) => (listeners[ev] || []).forEach((f) => f(...args));
 
+export function defaultProduct() {
+  const c = CONFIG.colors[0].hex;
+  return {
+    color: c,
+    zones: { front: c, back: c, sleeveL: c, sleeveR: c, collar: c },
+    pattern: 'solid',
+    patternColor: '#132448',
+    patternAlpha: 0.85,
+    fit: 'regular',
+    size: 'M',
+    qty: 1,
+  };
+}
+
 export const state = {
-  product: { color: CONFIG.colors[0].hex, neck: 'round', sleeve: 'short', fit: 'regular', size: 'M', qty: 1 },
+  product: defaultProduct(),
+  activeZone: 'all', // 'all' | 'front' | 'back' | 'sleeves' | 'collar'
   elements: { front: [], back: [] },
   selectedId: null,
-  side: 'front', // lado que mira a la cámara
+  side: 'front', // lado que mira a la cámara ('front' | 'back')
   guides: true,
-  bg: '#e8ecf3',
+  bg: '#eceff4',
 };
 
 /** Banco de imágenes: id -> { src, img, w, h } (los elementos sólo guardan el id). */
@@ -70,18 +85,18 @@ export function changed(structural = false, side = null) {
 }
 
 // ---------- Operaciones sobre elementos ----------
-export function addElement(el) {
+export function addElement(el, targetSide = null) {
   commit();
   el.id = newId();
-  el.side = state.side;
+  el.side = targetSide || state.side;
   el.x ??= 0;
-  el.y ??= -0.25;
+  el.y ??= -0.15;
   el.rot ??= 0;
   el.s ??= 1;
   el.opacity ??= 1;
   state.elements[el.side].push(el);
   state.selectedId = el.id;
-  changed(true);
+  changed(true, el.side);
   return el;
 }
 
@@ -92,7 +107,7 @@ export function removeElement(id) {
   const list = state.elements[el.side];
   list.splice(list.indexOf(el), 1);
   if (state.selectedId === id) state.selectedId = null;
-  changed(true);
+  changed(true, el.side);
 }
 
 export function selectElement(id) {
@@ -108,7 +123,7 @@ export function duplicateElement(id) {
   const copy = { ...JSON.parse(JSON.stringify(el)), id: newId(), x: el.x + 0.08, y: el.y + 0.08 };
   state.elements[el.side].push(copy);
   state.selectedId = copy.id;
-  changed(true);
+  changed(true, el.side);
 }
 
 /** dir: 1 = subir, -1 = bajar, 'top' / 'bottom' */
@@ -125,7 +140,7 @@ export function moveLayer(id, dir) {
   commit();
   list.splice(i, 1);
   list.splice(j, 0, el);
-  changed(true);
+  changed(true, el.side);
 }
 
 export function clearSide(side) {
@@ -133,15 +148,15 @@ export function clearSide(side) {
   commit();
   state.elements[side] = [];
   if (selected() === null) state.selectedId = null;
-  changed(true);
+  changed(true, side);
 }
 
 // ---------- Precio ----------
 export function priceInfo() {
   const P = CONFIG.prices;
   const p = state.product;
-  const lines = [{ label: 'Camisa lisa', amount: P.base }];
-  if (p.sleeve === 'long') lines.push({ label: 'Manga larga', amount: P.longSleeve });
+  const lines = [{ label: 'Camisa base Pro', amount: P.base }];
+  if (p.pattern && p.pattern !== 'solid') lines.push({ label: 'Sublimación / patrón', amount: P.pattern });
   if (p.fit === 'oversize') lines.push({ label: 'Ajuste oversize', amount: P.oversize });
   const sides = ['front', 'back'].filter((s) => state.elements[s].some((e) => !e.hidden));
   if (sides.length) {
@@ -169,8 +184,8 @@ export function usedImages(elements = state.elements) {
 
 export function serializeDesign() {
   return {
-    v: 1,
-    product: { ...state.product },
+    v: 2,
+    product: JSON.parse(JSON.stringify(state.product)),
     elements: JSON.parse(JSON.stringify(state.elements)),
     images: usedImages(),
   };
@@ -201,7 +216,21 @@ export async function loadDesign(data) {
       /* imagen corrupta: se ignora */
     }
   }
-  state.product = { ...state.product, ...data.product };
+  const base = defaultProduct();
+  const incoming = data.product || {};
+  const mainColor = incoming.color || base.color;
+  state.product = {
+    ...base,
+    ...incoming,
+    zones: {
+      front: mainColor,
+      back: mainColor,
+      sleeveL: mainColor,
+      sleeveR: mainColor,
+      collar: mainColor,
+      ...(incoming.zones || {}),
+    },
+  };
   state.elements = { front: data.elements?.front || [], back: data.elements?.back || [] };
   state.selectedId = null;
   resetHistory();
