@@ -11,17 +11,29 @@
   </head>
   <body>
     <div id="app">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark">dC</div>
+          <span>deCero</span>
+        </div>
+        <div class="top-actions">
+          <button class="btn ghost" id="btn-install" hidden>Instalar app</button>
+          <button class="cart-icon-btn" id="btn-cart" title="Ver carrito" aria-label="Carrito">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+            </svg>
+            <span class="badge" id="cart-count">0</span>
+          </button>
+        </div>
+      </header>
+
       <main class="workspace">
         <section class="stage" id="stage">
           <div id="viewport"></div>
 
-          <!-- Flotante Izquierda: marca + controles de vista/visor -->
+          <!-- Flotante Izquierda: controles de vista/visor -->
           <div class="float-rail left">
-            <div class="brand-pill" title="deCero 3D Studio">
-              <div class="brand-mark">dC</div>
-              <span class="hide-xs">deCero<b>3D</b></span>
-            </div>
-
             <div class="float-group">
               <button class="fbtn active" data-view="front" title="Vista frente">Frente</button>
               <button class="fbtn" data-view="back" title="Vista espalda">Espalda</button>
@@ -48,7 +60,7 @@
             </div>
           </div>
 
-          <!-- Flotante Derecha: maximizar + carrito + herramientas -->
+          <!-- Flotante Derecha: maximizar + herramientas -->
           <div class="float-rail right">
             <div class="float-group">
               <button class="fbtn icon-only" id="btn-maximize" title="Maximizar visor 3D" aria-label="Maximizar visor 3D">
@@ -56,10 +68,6 @@
                   <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/>
                   <line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
                 </svg>
-              </button>
-              <button class="fbtn primary-pill" id="btn-cart" title="Ver carrito" aria-label="Carrito">
-                <span>🛒</span>
-                <span class="badge" id="cart-count">0</span>
               </button>
             </div>
 
@@ -76,7 +84,6 @@
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
                 </svg>
               </button>
-              <button class="fbtn icon-only" id="btn-install" title="Instalar app" aria-label="Instalar app" hidden>📲</button>
             </div>
           </div>
 
@@ -125,7 +132,11 @@
               <h3>Imagen o Logo</h3>
               <label class="dropzone" id="dropzone">
                 <input type="file" id="file-input" accept="image/*" hidden />
-                <span class="dz-icon">🖼️</span>
+                <span class="dz-plus" aria-hidden="true">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+                    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                  </svg>
+                </span>
                 <b>Subir imagen o logo</b>
                 <small>PNG transparente, SVG, JPG o WebP · arrastra o pega (Ctrl+V)</small>
               </label>
@@ -166,7 +177,10 @@
               <h3>Resumen de precio</h3>
               <ul class="price-lines" id="price-lines"></ul>
 
-              <button class="btn primary big wide" id="btn-add-cart" style="margin-top: 14px">Añadir al carrito</button>
+              <div class="price-actions">
+                <button class="btn primary big wide" id="btn-buy-now">Comprar</button>
+                <button class="btn big wide" id="btn-add-cart">Añadir al carrito</button>
+              </div>
             </section>
           </div>
 

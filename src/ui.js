@@ -623,17 +623,21 @@ export function initUI(viewer) {
     toast('Diseño cargado. Vuelve a añadirlo al carrito al terminar.');
   }
 
+  function buildCurrentCartItem() {
+    const design = serializeDesign();
+    const { sides, unit } = priceInfo(design.product, design.elements);
+    const jpg = (c) => c.toDataURL('image/jpeg', 0.88);
+    const thumbFront = jpg(viewer.capture('front', 400));
+    const thumbBack = sides.includes('back') ? jpg(viewer.capture('back', 400)) : null;
+    const qty = state.product.qty;
+    return { id: newId('c'), createdAt: Date.now(), design, sides, unit, qty, total: itemTotal(unit, qty), thumbFront, thumbBack };
+  }
+
   $('#btn-add-cart').onclick = async (e) => {
     const btn = e.currentTarget;
     btn.disabled = true;
     try {
-      const design = serializeDesign();
-      const { sides, unit } = priceInfo(design.product, design.elements);
-      const jpg = (c) => c.toDataURL('image/jpeg', 0.88);
-      const thumbFront = jpg(viewer.capture('front', 400));
-      const thumbBack = sides.includes('back') ? jpg(viewer.capture('back', 400)) : null;
-      const qty = state.product.qty;
-      cart.push({ id: newId('c'), createdAt: Date.now(), design, sides, unit, qty, total: itemTotal(unit, qty), thumbFront, thumbBack });
+      cart.push(buildCurrentCartItem());
       await saveCart();
       renderCart();
       toast('Añadido al carrito', 'Ver carrito', () => dlgCart.showModal());
@@ -641,6 +645,20 @@ export function initUI(viewer) {
       btn.disabled = false;
     }
   };
+
+  $('#btn-buy-now').onclick = async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    try {
+      cart.push(buildCurrentCartItem());
+      await saveCart();
+      renderCart();
+      openCheckout();
+    } finally {
+      btn.disabled = false;
+    }
+  };
+
   $('#btn-cart').onclick = () => { renderCart(); dlgCart.showModal(); };
 
   // ---- Checkout ----
