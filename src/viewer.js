@@ -425,13 +425,13 @@ export function createViewer(container) {
         el.y = Math.max(-1.35, Math.min(1.35, pt.y + drag.off.y));
       } else if (drag.mode === 'scale') {
         const d = Math.hypot(pt.x - el.x, pt.y - el.y);
-        const maxS = maxScaleForElement(el, el.space || state.product.printSpace);
-        el.s = Math.max(0.08, Math.min(maxS, drag.s0 * (d / drag.d0)));
+        const maxS = Math.min(2, maxScaleForElement(el, el.space || state.product.printSpace));
+        el.s = Math.max(0.01, Math.min(maxS, drag.s0 * (d / drag.d0)));
       } else if (drag.mode === 'rotate') {
         const a = Math.atan2(pt.y - el.y, pt.x - el.x);
         let r = drag.rot0 + ((a - drag.a0) * 180) / Math.PI;
-        r = ((((r + 180) % 360) + 360) % 360) - 180;
-        el.rot = snapAngle(r);
+        r = ((r % 360) + 360) % 360;
+        el.rot = snapAngle(r) % 360;
       }
       changed(false, el.side);
       return;

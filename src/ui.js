@@ -59,6 +59,7 @@ const MAX_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" str
 const MIN_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
 const PENCIL_SVG = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>';
 const LOCK_SVG = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+const TRASH_SVG = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>';
 
 export function initUI(viewer) {
   const app = $('#app');
@@ -132,16 +133,6 @@ export function initUI(viewer) {
     }));
   });
 
-  // Selector desplegable de Tamaño (límite de tamaño para cada nueva imagen en pestaña Diseño)
-  const spaceSelect = $('#space-select');
-  CONFIG.printSpaces.forEach((sp) => {
-    spaceSelect.append(h('option', { value: sp.id, text: `${sp.label} · ${sp.desc}` }));
-  });
-  spaceSelect.addEventListener('change', () => {
-    state.product.printSpace = spaceSelect.value;
-    emit('product');
-  });
-
   const colorLabel = (hex) => CONFIG.colors.find((c) => c.hex.toLowerCase() === (hex || '').toLowerCase())?.name || hex;
 
   function renderProduct() {
@@ -203,9 +194,6 @@ export function initUI(viewer) {
         onclick: () => { state.product.size = s; emit('product'); },
       }));
     });
-
-    // Tamaño de diseño seleccionado
-    spaceSelect.value = p.printSpace;
 
     renderPrice();
   }
@@ -326,11 +314,11 @@ export function initUI(viewer) {
     if (f) processFile(f);
   });
 
-  // ---------------- Capas y propiedades ----------------
+  // ---------------- Capas y propiedades por elemento ----------------
   const layersEl = $('#layers');
-  const propsEl = $('#props');
   let binders = [];
   let editKey = null;
+  let expandedId = null;
   const begin = (k) => { if (editKey !== k) { commit(); editKey = k; } };
   document.addEventListener('change', () => (editKey = null));
   document.addEventListener('focusout', () => (editKey = null));
@@ -349,32 +337,28 @@ export function initUI(viewer) {
     return h('span', { text: SHAPE_GLYPH[el.shape] || '★', style: `color:${el.fill}` });
   };
 
-  function renderLayers() {
-    $('#side-label').textContent = state.side === 'front' ? 'Frente' : 'Espalda';
-    layersEl.innerHTML = '';
-    const list = state.elements[state.side];
-    [...list].reverse().forEach((el) => {
-      const li = h('li', { class: 'layer' + (el.id === state.selectedId ? ' active' : '') + (el.hidden ? ' off' : ''), 'data-id': el.id, onclick: () => selectElement(el.id) },
-        h('div', { class: 'thumb' }, layerThumb(el)),
-        h('div', { class: 'name', text: layerLabel(el) }),
-        h('button', {
-          class: 'eye', title: el.hidden ? 'Mostrar' : 'Ocultar', text: el.hidden ? '🚫' : '👁',
-          onclick: (e) => { e.stopPropagation(); commit(); el.hidden = !el.hidden; changed(true); },
-        }));
-      layersEl.append(li);
-    });
-  }
-
   const fld = (label, ...ctrl) => h('div', { class: 'field' }, h('span', { class: 'lbl' }, label), ...ctrl);
 
-  function range(el, key, label, min, max, step, fmt = (v) => v) {
+  function range(el, key, label, min, max, step, fmt = (v) => v, normalize = null) {
     const out = h('output');
     const input = h('input', { type: 'range', min, max, step });
-    const sync = () => { input.value = el[key] ?? 0; out.textContent = fmt(+input.value); };
+    const getVal = () => {
+      let v = el[key] ?? min;
+      if (key === 'rot') v = ((v % 360) + 360) % 360;
+      return v;
+    };
+    const sync = () => {
+      const v = getVal();
+      input.value = v;
+      out.textContent = fmt(+input.value);
+    };
     input.addEventListener('input', () => {
       begin(el.id + key);
-      el[key] = +input.value;
-      out.textContent = fmt(el[key]);
+      let v = +input.value;
+      if (normalize) v = normalize(v);
+      el[key] = v;
+      input.value = v;
+      out.textContent = fmt(v);
       changed(false, el.side);
     });
     binders.push(sync);
@@ -405,15 +389,8 @@ export function initUI(viewer) {
     return fld(label, wrap);
   }
 
-  function renderProps() {
-    binders = [];
-    propsEl.innerHTML = '';
-    const el = selected();
-    if (!el) {
-      propsEl.append(h('p', { class: 'muted small', text: 'Selecciona una capa, o toca un diseño sobre la camiseta 3D, para moverlo, escalarlo o rotarlo.' }));
-      return;
-    }
-    const card = h('div', { class: 'prop-card' });
+  function buildLayerProps(el) {
+    const panel = h('div', { class: 'layer-props' });
 
     if (el.type === 'text') {
       const ta = h('textarea', { rows: 2, spellcheck: false });
@@ -421,13 +398,13 @@ export function initUI(viewer) {
         begin(el.id + 'text');
         el.text = ta.value;
         changed(false, el.side);
-        const name = $(`.layer[data-id="${el.id}"] .name`);
+        const name = $(`.layer-card[data-id="${el.id}"] .name`);
         if (name) name.textContent = layerLabel(el);
       });
       const syncText = () => { if (document.activeElement !== ta) ta.value = el.text; };
       binders.push(syncText);
       syncText();
-      card.append(fld('Texto', ta));
+      panel.append(fld('Texto', ta));
 
       const grid = h('div', { class: 'font-grid' });
       const fb = CONFIG.fonts.map((f) => h('button', {
@@ -443,42 +420,118 @@ export function initUI(viewer) {
       const syncFonts = () => fb.forEach((b, i) => b.classList.toggle('active', CONFIG.fonts[i].family === el.font));
       grid.append(...fb);
       binders.push(syncFonts);
-      card.append(fld('Tipografía', grid));
-      card.append(colorField(el, 'color', 'Color'));
-      card.append(colorField(el, 'strokeColor', 'Color del contorno'));
-      card.append(range(el, 'strokeW', 'Grosor del contorno', 0, 14, 0.5));
-      card.append(range(el, 'curve', 'Curvatura', -100, 100, 1, (v) => v + '%'));
-      card.append(range(el, 'spacing', 'Espaciado de letras', -10, 60, 1));
-      card.append(miniSeg(el, 'align', 'Alineación', [['left', '⇤'], ['center', '↔'], ['right', '⇥']]));
+      panel.append(fld('Tipografía', grid));
+      panel.append(colorField(el, 'color', 'Color'));
+      panel.append(colorField(el, 'strokeColor', 'Color del contorno'));
+      panel.append(range(el, 'strokeW', 'Grosor del contorno', 0, 14, 0.5));
+      panel.append(range(el, 'curve', 'Curvatura', -100, 100, 1, (v) => v + '%'));
+      panel.append(range(el, 'spacing', 'Espaciado de letras', -10, 60, 1));
+      panel.append(miniSeg(el, 'align', 'Alineación', [['left', '⇤'], ['center', '↔'], ['right', '⇥']]));
     }
 
     if (el.type === 'shape') {
-      card.append(colorField(el, 'fill', 'Relleno'));
-      card.append(miniSeg(el, 'noFill', 'Relleno activo', [['false', 'Con relleno'], ['true', 'Sólo contorno']], () => { el.noFill = el.noFill === 'true' || el.noFill === true; if (el.noFill && !(el.strokeW > 0)) el.strokeW = 6; }));
-      card.append(colorField(el, 'stroke', 'Color del contorno'));
-      card.append(range(el, 'strokeW', 'Grosor del contorno', 0, 14, 0.5));
+      panel.append(colorField(el, 'fill', 'Relleno'));
+      panel.append(miniSeg(el, 'noFill', 'Relleno activo', [['false', 'Con relleno'], ['true', 'Sólo contorno']], () => { el.noFill = el.noFill === 'true' || el.noFill === true; if (el.noFill && !(el.strokeW > 0)) el.strokeW = 6; }));
+      panel.append(colorField(el, 'stroke', 'Color del contorno'));
+      panel.append(range(el, 'strokeW', 'Grosor del contorno', 0, 14, 0.5));
     }
 
-    const maxS = +Math.min(8, maxScaleForElement(el, el.space || state.product.printSpace)).toFixed(2);
-    card.append(range(el, 's', 'Tamaño', 0.1, Math.max(0.2, maxS), 0.01, (v) => Math.round(v * 100) + '%'));
-    card.append(range(el, 'rot', 'Rotación', -180, 180, 1, (v) => v + '°'));
-    card.append(range(el, 'opacity', 'Opacidad', 0.1, 1, 0.01, (v) => Math.round(v * 100) + '%'));
+    // Opciones principales: Tamaño (1% al 200%), Rotación (0° a 360°) y Opacidad (10% al 100%)
+    panel.append(range(
+      el,
+      's',
+      'Tamaño',
+      0.01,
+      2,
+      0.01,
+      (v) => Math.round(v * 100) + '%',
+      (v) => Math.min(v, maxScaleForElement(el, el.space || state.product.printSpace)),
+    ));
+    panel.append(range(el, 'rot', 'Rotación', 0, 360, 1, (v) => Math.round(v) + '°'));
+    panel.append(range(el, 'opacity', 'Opacidad', 0.1, 1, 0.01, (v) => Math.round(v * 100) + '%'));
 
     const act = h('div', { class: 'actions' },
       h('button', { class: 'btn', text: 'Centrar', onclick: () => { commit(); el.x = 0; changed(false, el.side); } }),
       el.type === 'image' && h('button', { class: 'btn', text: 'Voltear', onclick: () => { commit(); el.flipX = !el.flipX; changed(false, el.side); } }),
       h('button', { class: 'btn', text: '▲ Subir', onclick: () => moveLayer(el.id, 1) }),
       h('button', { class: 'btn', text: '▼ Bajar', onclick: () => moveLayer(el.id, -1) }),
-      h('button', { class: 'btn', text: 'Duplicar', onclick: () => duplicateElement(el.id) }),
-      h('button', { class: 'btn danger', text: 'Eliminar', onclick: () => removeElement(el.id) }));
-    card.append(act);
-    propsEl.append(card);
+      h('button', { class: 'btn', text: 'Duplicar', onclick: () => duplicateElement(el.id) }));
+    panel.append(act);
+    return panel;
+  }
+
+  function renderLayers() {
+    binders = [];
+    $('#side-label').textContent = state.side === 'front' ? 'Frente' : 'Espalda';
+    layersEl.innerHTML = '';
+    const list = state.elements[state.side];
+    if (expandedId && !list.some((e) => e.id === expandedId)) expandedId = null;
+
+    [...list].reverse().forEach((el) => {
+      const isSelected = el.id === state.selectedId;
+      const isExpanded = el.id === expandedId;
+
+      const sizeSel = h('select', {
+        'aria-label': 'Tamaño límite',
+        onclick: (e) => e.stopPropagation(),
+        onchange: (e) => {
+          commit();
+          el.space = e.target.value;
+          const maxS = maxScaleForElement(el, el.space);
+          if (el.s > maxS) el.s = maxS;
+          selectElement(el.id);
+          changed(true, el.side);
+        },
+      }, ...CONFIG.printSpaces.map((sp) => h('option', {
+        value: sp.id,
+        text: `${sp.label} · ${sp.desc}`,
+        selected: (el.space || state.product.printSpace) === sp.id,
+      })));
+
+      const card = h('li', {
+        class: 'layer-card' + (isSelected ? ' active' : '') + (el.hidden ? ' off' : ''),
+        'data-id': el.id,
+      },
+      h('div', { class: 'layer-head', onclick: () => selectElement(el.id) },
+        h('div', { class: 'thumb' }, layerThumb(el)),
+        h('div', { class: 'name', text: layerLabel(el) }),
+        h('div', { class: 'layer-actions' },
+          h('button', {
+            class: 'layer-icon' + (isExpanded ? ' active' : ''),
+            title: isExpanded ? 'Ocultar opciones' : 'Editar opciones',
+            'aria-label': isExpanded ? 'Ocultar opciones' : 'Editar opciones',
+            html: PENCIL_SVG,
+            onclick: (e) => {
+              e.stopPropagation();
+              expandedId = isExpanded ? null : el.id;
+              if (!isExpanded && state.selectedId !== el.id) selectElement(el.id);
+              else renderLayers();
+            },
+          }),
+          h('button', {
+            class: 'layer-icon',
+            title: el.hidden ? 'Mostrar' : 'Ocultar',
+            text: el.hidden ? '🚫' : '👁',
+            onclick: (e) => { e.stopPropagation(); commit(); el.hidden = !el.hidden; changed(true); },
+          }),
+          h('button', {
+            class: 'layer-icon danger',
+            title: 'Eliminar',
+            'aria-label': 'Eliminar',
+            html: TRASH_SVG,
+            onclick: (e) => { e.stopPropagation(); removeElement(el.id); },
+          }),
+        )),
+      h('div', { class: 'layer-size-row' }, h('span', { text: 'Tamaño' }), sizeSel),
+      isExpanded ? buildLayerProps(el) : null);
+
+      layersEl.append(card);
+    });
   }
 
   let lastSel = null;
   on('layers', () => {
     renderLayers();
-    renderProps();
     if (state.selectedId && state.selectedId !== lastSel) showTab('add');
     lastSel = state.selectedId;
   });
@@ -818,7 +871,6 @@ export function initUI(viewer) {
   })();
   renderProduct();
   renderLayers();
-  renderProps();
   syncHistory();
   showTab(currentTab);
   return { showTab };
