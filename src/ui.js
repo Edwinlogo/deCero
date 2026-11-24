@@ -494,7 +494,7 @@ export function initUI(viewer) {
           text: `${sp.label} · ${sp.desc} (${priceTxt})`,
           selected: (el.space || state.product.printSpace) === sp.id,
         });
-      })));
+      }));
 
       const card = h('li', {
         class: 'layer-card' + (isSelected ? ' active' : '') + (el.hidden ? ' off' : ''),
