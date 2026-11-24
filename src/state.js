@@ -1,5 +1,5 @@
 // Estado global del editor + eventos + historial (deshacer / rehacer).
-import { CONFIG, getLine, getReference, getSizesForAudience } from './config.js';
+import { CONFIG, getLine, getReference, getSizesForAudience, getPrintSpace, getPrintSpacePrice } from './config.js';
 
 const listeners = {};
 export const on = (ev, fn) => {
@@ -191,12 +191,20 @@ export function priceInfo(product = state.product, elements = state.elements) {
   const line = getLine(product.line);
   const ref = getReference(product.line, product.reference);
   const lines = [{ label: `${line.shortLabel} · ${ref.label}`, amount: ref.price }];
-  const sides = ['front', 'back'].filter((s) => elements[s].some((e) => !e.hidden));
-  if (sides.length) {
-    lines.push({
-      label: `Estampado ${sides.length === 2 ? 'frente + espalda' : sides[0] === 'front' ? 'frente' : 'espalda'}`,
-      amount: P.printSide * sides.length,
-    });
+  const sides = [];
+  for (const side of ['front', 'back']) {
+    const visible = elements[side].filter((e) => !e.hidden);
+    if (!visible.length) continue;
+    sides.push(side);
+    const sideLabel = side === 'front' ? 'Frente' : 'Espalda';
+    for (const el of visible) {
+      const sp = getPrintSpace(el.space || product.printSpace);
+      const amount = getPrintSpacePrice(sp.id, product.size, product.audience);
+      lines.push({
+        label: `Estampado ${sideLabel} · ${sp.label} (${sp.desc})`,
+        amount,
+      });
+    }
   }
   const unit = lines.reduce((a, l) => a + l.amount, 0);
   const qty = product.qty;

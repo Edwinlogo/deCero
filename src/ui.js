@@ -1,5 +1,5 @@
 // Interfaz de usuario: flotantes laterales, maximizar 3D, prenda por línea, diseño, capas y liquidación de precio.
-import { CONFIG, getLine, getReference, getSizesForAudience, getPrintSpace, money } from './config.js';
+import { CONFIG, getLine, getReference, getSizesForAudience, getPrintSpace, getPrintSpacePrice, money } from './config.js';
 import {
   state, defaultProduct, normalizeProduct, on, emit, images, selected, addElement, removeElement, selectElement, duplicateElement, moveLayer, clearSide,
   commit, changed, undo, redo, canUndo, canRedo, priceInfo, registerImage, newId, serializeDesign, loadDesign, loadImage,
@@ -196,6 +196,7 @@ export function initUI(viewer) {
     });
 
     renderPrice();
+    renderLayers();
   }
 
   function renderPrice() {
@@ -214,8 +215,10 @@ export function initUI(viewer) {
       ['Color', colorLabel(p.color)],
       ...(ref.customCollar ? [['Color del cuello', colorLabel(p.collarColor)]] : []),
       ['Talla', p.size],
-      ['Tamaño diseño', (() => { const sp = getPrintSpace(p.printSpace); return `${sp.label} (${sp.desc})`; })()],
-      ['Estampado', info.sides.length === 2 ? 'Frente y espalda' : info.sides[0] === 'front' ? 'Frente' : info.sides[0] === 'back' ? 'Espalda' : 'Sin estampado'],
+      ['Estampados', (() => {
+        const count = [...state.elements.front, ...state.elements.back].filter((e) => !e.hidden).length;
+        return count ? `${count} ${count === 1 ? 'diseño' : 'diseños'}` : 'Sin estampado';
+      })()],
     ];
     rows.forEach(([k, v]) => sumBox.append(h('div', { class: 'summary-row' }, h('span', { text: k }), h('b', { text: v }))));
 
@@ -482,10 +485,15 @@ export function initUI(viewer) {
           selectElement(el.id);
           changed(true, el.side);
         },
-      }, ...CONFIG.printSpaces.map((sp) => h('option', {
-        value: sp.id,
-        text: `${sp.label} · ${sp.desc}`,
-        selected: (el.space || state.product.printSpace) === sp.id,
+      }, ...CONFIG.printSpaces.map((sp) => {
+        const priceTxt = sp.unlimited
+          ? `${money(getPrintSpacePrice(sp.id, state.product.size, state.product.audience))}`
+          : money(sp.price);
+        return h('option', {
+          value: sp.id,
+          text: `${sp.label} · ${sp.desc} (${priceTxt})`,
+          selected: (el.space || state.product.printSpace) === sp.id,
+        });
       })));
 
       const card = h('li', {
@@ -668,9 +676,8 @@ export function initUI(viewer) {
   const describe = (p) => {
     const line = getLine(p.line);
     const ref = getReference(p.line, p.reference);
-    const sp = getPrintSpace(p.printSpace);
     const collarPart = ref.customCollar ? ` · Cuello ${colorLabel(p.collarColor)}` : '';
-    return `${line.label} · ${ref.label} · ${p.audience} · Talla ${p.size} · ${colorLabel(p.color)}${collarPart} · Espacio ${sp.label} (${sp.desc})`;
+    return `${line.label} · ${ref.label} · ${p.audience} · Talla ${p.size} · ${colorLabel(p.color)}${collarPart}`;
   };
 
   function renderCart() {

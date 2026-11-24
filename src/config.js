@@ -1,22 +1,21 @@
 // Configuración de la tienda, líneas de producto, referencias, tallas y colores.
 export const CONFIG = {
   storeName: 'deCero 3D',
-  currency: 'USD',
-  locale: 'es-US',
+  currency: 'COP',
+  locale: 'es-CO',
   // Número de WhatsApp con código de país, sin "+" (ej: '573001234567'). Si está vacío no se muestra el botón.
   whatsapp: '',
   prices: {
-    printSide: 6, // por cada lado estampado (frente / espalda)
     bulkMinQty: 6, // descuento por volumen desde esta cantidad
     bulkDiscount: 0.12,
   },
   adultSizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
   kidsSizes: ['2 - 4', '6 - 8', '10 - 12', '14 - 16'],
   printSpaces: [
-    { id: 'pequeno', label: 'Pequeño', desc: '7cm × 7cm', w: 0.4, h: 0.4, unlimited: false },
-    { id: 'mediano', label: 'Mediano', desc: '15cm × 15cm', w: 0.78, h: 0.78, unlimited: false },
-    { id: 'grande', label: 'Grande', desc: 'Carta', w: 1.08, h: 1.4, unlimited: false },
-    { id: 'especial', label: 'Diseño especiales', desc: 'Tamaño sin límite', w: 1.48, h: 2.05, unlimited: true },
+    { id: 'pequeno', label: 'Pequeño', desc: '7cm × 7cm', w: 0.4, h: 0.4, unlimited: false, price: 4500 },
+    { id: 'mediano', label: 'Mediano', desc: '15cm × 15cm', w: 0.78, h: 0.78, unlimited: false, price: 8000 },
+    { id: 'grande', label: 'Grande', desc: 'Carta', w: 1.08, h: 1.4, unlimited: false, price: 10000 },
+    { id: 'especial', label: 'Diseño especiales', desc: 'Tamaño sin límite', w: 1.48, h: 2.05, unlimited: true, priceMin: 12000, priceMax: 15000 },
   ],
   productLines: [
     {
@@ -25,9 +24,9 @@ export const CONFIG = {
       shortLabel: 'Básica',
       audiences: ['Hombre', 'Mujer', 'Niños'],
       references: [
-        { id: 'piel-durazno', label: 'Piel de durazno', price: 14, audiences: ['Hombre', 'Mujer'], fit: 'regular' },
-        { id: 'algodon-175', label: 'Algodón 175 gr', price: 16, audiences: ['Hombre', 'Mujer'], fit: 'regular' },
-        { id: 'algodon-ninos', label: 'Algodón niños', price: 13, audiences: ['Niños'], fit: 'kids' },
+        { id: 'piel-durazno', label: 'Piel de durazno', price: 16890, audiences: ['Hombre', 'Mujer'], fit: 'regular' },
+        { id: 'algodon-175', label: 'Algodón 175 gr', price: 19999, audiences: ['Hombre', 'Mujer'], fit: 'regular' },
+        { id: 'algodon-ninos', label: 'Algodón niños', price: 16100, audiences: ['Niños'], fit: 'kids' },
       ],
     },
     {
@@ -36,9 +35,9 @@ export const CONFIG = {
       shortLabel: 'Media',
       audiences: ['Hombre', 'Mujer'],
       references: [
-        { id: 'tela-fria', label: 'Tela fría', price: 19, audiences: ['Hombre', 'Mujer'], fit: 'regular' },
-        { id: 'pesada-220', label: 'Tipo pesada 220 gr', price: 21, audiences: ['Hombre', 'Mujer'], fit: 'heavy' },
-        { id: 'blusa-dama', label: 'Blusa para dama', price: 19, audiences: ['Mujer'], fit: 'fitted' },
+        { id: 'tela-fria', label: 'Tela fría', price: 37950, audiences: ['Hombre', 'Mujer'], fit: 'regular' },
+        { id: 'pesada-220', label: 'Tipo pesada 220 gr', price: 39999, audiences: ['Hombre', 'Mujer'], fit: 'heavy' },
+        { id: 'blusa-dama', label: 'Blusa para dama', price: 32890, audiences: ['Mujer'], fit: 'fitted' },
       ],
     },
     {
@@ -47,10 +46,10 @@ export const CONFIG = {
       shortLabel: 'Premium',
       audiences: ['Hombre', 'Mujer'],
       references: [
-        { id: 'pesada-265', label: 'Tipo pesada 265 gr', price: 26, audiences: ['Hombre', 'Mujer'], fit: 'heavy' },
-        { id: 'qatar-oversize', label: 'Qatar oversize', price: 28, audiences: ['Hombre', 'Mujer'], fit: 'oversize' },
-        { id: 'cuello-colores-normal', label: 'Cuello colores normal', price: 27, audiences: ['Hombre', 'Mujer'], fit: 'regular', customCollar: true },
-        { id: 'cuello-colores-crop', label: 'Cuello colores crop top', price: 25, audiences: ['Mujer'], fit: 'crop', customCollar: true },
+        { id: 'pesada-265', label: 'Tipo pesada 265 gr', price: 57950, audiences: ['Hombre', 'Mujer'], fit: 'heavy' },
+        { id: 'qatar-oversize', label: 'Qatar oversize', price: 59970, audiences: ['Hombre', 'Mujer'], fit: 'oversize' },
+        { id: 'cuello-colores-normal', label: 'Cuello colores normal', price: 45750, audiences: ['Hombre', 'Mujer'], fit: 'regular', customCollar: true },
+        { id: 'cuello-colores-crop', label: 'Cuello colores crop top', price: 49860, audiences: ['Mujer'], fit: 'crop', customCollar: true },
       ],
     },
   ],
@@ -119,6 +118,19 @@ export function getPrintSpace(spaceId) {
   return CONFIG.printSpaces.find((s) => s.id === spaceId) || CONFIG.printSpaces[2];
 }
 
+/** Precio de un estampado según su tamaño y la talla de la camisa (12.000 a 15.000 en diseño especial). */
+export function getPrintSpacePrice(spaceId, shirtSize = 'M', audience = 'Hombre') {
+  const sp = getPrintSpace(spaceId);
+  if (!sp.unlimited) return sp.price;
+  if (audience === 'Niños' || shirtSize === 'XS' || shirtSize === 'S') return 12000;
+  if (shirtSize === 'XL' || shirtSize === 'XXL') return 15000;
+  return 13500; // M y L
+}
+
 export function money(v) {
-  return new Intl.NumberFormat(CONFIG.locale, { style: 'currency', currency: CONFIG.currency }).format(v);
+  return new Intl.NumberFormat(CONFIG.locale, {
+    style: 'currency',
+    currency: CONFIG.currency,
+    maximumFractionDigits: 0,
+  }).format(Math.round(v));
 }
