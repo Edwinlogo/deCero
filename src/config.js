@@ -12,6 +12,12 @@ export const CONFIG = {
   },
   adultSizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
   kidsSizes: ['2 - 4', '6 - 8', '10 - 12', '14 - 16'],
+  printSpaces: [
+    { id: 'pequeno', label: 'Pequeño', desc: '7cm × 7cm', w: 0.4, h: 0.4, unlimited: false },
+    { id: 'mediano', label: 'Mediano', desc: '15cm × 15cm', w: 0.78, h: 0.78, unlimited: false },
+    { id: 'grande', label: 'Grande', desc: 'Carta', w: 1.08, h: 1.4, unlimited: false },
+    { id: 'especial', label: 'Diseño especiales', desc: 'Tamaño sin límite', w: 1.48, h: 2.05, unlimited: true },
+  ],
   productLines: [
     {
       id: 'basica',
@@ -107,6 +113,10 @@ export function getReference(lineId, refId) {
 
 export function getSizesForAudience(audience) {
   return audience === 'Niños' ? CONFIG.kidsSizes : CONFIG.adultSizes;
+}
+
+export function getPrintSpace(spaceId) {
+  return CONFIG.printSpaces.find((s) => s.id === spaceId) || CONFIG.printSpaces[2];
 }
 
 export function money(v) {

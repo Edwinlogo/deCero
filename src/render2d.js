@@ -1,7 +1,7 @@
 // Motor de texturizado 2D (Atlas 2048x2048) para el modelo 3D shirt_baked.glb.
 // Pinta color de prenda, color de cuello (para referencias de cuello en color) y estampados HD.
 import { images } from './state.js';
-import { getReference } from './config.js';
+import { getReference, getPrintSpace } from './config.js';
 
 export const ATLAS_SIZE = 2048;
 export const UV_UNIT = 0.165; // 1 unidad de diseño = 0.165 en espacio UV (proporción 1:1)
@@ -92,6 +92,17 @@ function localSize(el) {
 export function getBounds(el) {
   const b = localSize(el);
   return { w: (b.w * el.s) / 100, h: (b.h * el.s) / 100 };
+}
+
+/** Escala máxima permitida para un elemento según el espacio de impresión seleccionado. */
+export function maxScaleForElement(el, spaceId) {
+  const sp = getPrintSpace(spaceId);
+  if (sp.unlimited) return 8;
+  const b = localSize(el);
+  const bw = b.w / 100;
+  const bh = b.h / 100;
+  if (bw <= 0 || bh <= 0) return 4.5;
+  return Math.max(0.1, Math.min(sp.w / bw, sp.h / bh));
 }
 
 function drawTextLine(ctx, text, width, y, el, maxW) {
@@ -333,18 +344,30 @@ function drawGuides(ctx, el, cx, cy) {
   ctx.restore();
 }
 
-function drawPrintArea(ctx, side, isCrop = false) {
+function drawPrintArea(ctx, side, product, isCrop = false) {
   const c = SIDE_CENTER[side];
   const cx = c.u * ATLAS_SIZE;
   const cy = c.v * ATLAS_SIZE;
+  const sp = getPrintSpace(product?.printSpace);
+  const wUnits = isCrop ? Math.min(sp.w, 1.32) : sp.w;
+  const hUnits = isCrop ? Math.min(sp.h, 1.08) : sp.h;
+  const w = wUnits * PPU;
+  const h = hUnits * PPU;
+  const yCenter = isCrop ? cy - 0.51 * PPU : cy - 0.16 * PPU;
+  const x0 = cx - w / 2;
+  const y0 = yCenter - h / 2;
+
   ctx.save();
-  ctx.strokeStyle = 'rgba(59, 130, 246, 0.35)';
+  ctx.strokeStyle = 'rgba(37, 99, 235, 0.42)';
   ctx.lineWidth = 2.5;
-  ctx.setLineDash([16, 12]);
-  const w = (isCrop ? 1.32 : 1.48) * PPU;
-  const h = (isCrop ? 1.08 : 2.05) * PPU;
-  const yTop = isCrop ? cy - 1.05 * PPU : cy - h / 2 - 0.08 * PPU;
-  ctx.strokeRect(cx - w / 2, yTop, w, h);
+  ctx.setLineDash([14, 10]);
+  ctx.strokeRect(x0, y0, w, h);
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(37, 99, 235, 0.72)';
+  ctx.font = '600 22px Inter, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(sp.unlimited ? 'Sin límite' : `${sp.label} · ${sp.desc}`, x0 + 6, y0 - 8);
   ctx.restore();
 }
 
@@ -390,7 +413,7 @@ export function paintAtlas(ctx, { elements, product, guides = true, selectedId =
       drawElement(ctx, el, PPU, cx, cy);
     }
     if (guides) {
-      drawPrintArea(ctx, side, ref.fit === 'crop');
+      drawPrintArea(ctx, side, product, ref.fit === 'crop');
       const sel = elements[side].find((e) => e.id === selectedId);
       if (sel) drawGuides(ctx, sel, cx, cy);
     }

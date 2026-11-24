@@ -1,10 +1,10 @@
 // Interfaz de usuario: flotantes laterales, maximizar 3D, prenda por línea, diseño, capas y liquidación de precio.
-import { CONFIG, getLine, getReference, getSizesForAudience, money } from './config.js';
+import { CONFIG, getLine, getReference, getSizesForAudience, getPrintSpace, money } from './config.js';
 import {
   state, defaultProduct, normalizeProduct, on, emit, images, selected, addElement, removeElement, selectElement, duplicateElement, moveLayer, clearSide,
   commit, changed, undo, redo, canUndo, canRedo, priceInfo, registerImage, newId, serializeDesign, loadDesign, loadImage,
 } from './state.js';
-import { exportArt } from './render2d.js';
+import { exportArt, maxScaleForElement } from './render2d.js';
 import { kvGet, kvSet } from './storage.js';
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -130,6 +130,31 @@ export function initUI(viewer) {
     }));
   });
 
+  // Selector de Espacio (límite de tamaño en pestaña Diseño)
+  const spaceGrid = $('#space-grid');
+  CONFIG.printSpaces.forEach((sp) => {
+    spaceGrid.append(h('button', {
+      class: 'ref-btn',
+      'data-space': sp.id,
+      onclick: () => {
+        state.product.printSpace = sp.id;
+        // Ajustar elementos existentes que superen el nuevo límite
+        if (!sp.unlimited) {
+          for (const side of ['front', 'back']) {
+            for (const el of state.elements[side]) {
+              const maxS = maxScaleForElement(el, sp.id);
+              if (el.s > maxS) el.s = maxS;
+            }
+          }
+        }
+        emit('product');
+        changed(true);
+      },
+    },
+    h('b', { text: sp.label }),
+    h('small', { text: sp.desc })));
+  });
+
   const colorLabel = (hex) => CONFIG.colors.find((c) => c.hex.toLowerCase() === (hex || '').toLowerCase())?.name || hex;
 
   function renderProduct() {
@@ -192,6 +217,9 @@ export function initUI(viewer) {
       }));
     });
 
+    // Espacio de diseño seleccionado
+    $$('#space-grid .ref-btn').forEach((b) => b.classList.toggle('active', b.dataset.space === p.printSpace));
+
     renderPrice();
   }
 
@@ -211,6 +239,7 @@ export function initUI(viewer) {
       ['Color', colorLabel(p.color)],
       ...(ref.customCollar ? [['Color del cuello', colorLabel(p.collarColor)]] : []),
       ['Talla', p.size],
+      ['Espacio', (() => { const sp = getPrintSpace(p.printSpace); return `${sp.label} (${sp.desc})`; })()],
       ['Estampado', info.sides.length === 2 ? 'Frente y espalda' : info.sides[0] === 'front' ? 'Frente' : info.sides[0] === 'back' ? 'Espalda' : 'Sin estampado'],
     ];
     rows.forEach(([k, v]) => sumBox.append(h('div', { class: 'summary-row' }, h('span', { text: k }), h('b', { text: v }))));
@@ -282,7 +311,10 @@ export function initUI(viewer) {
       const src = file.type === 'image/jpeg' ? c.toDataURL('image/jpeg', 0.92) : c.toDataURL('image/png');
       const id = newId('img');
       await registerImage(id, src);
-      addElement({ type: 'image', imgId: id, name: file.name.replace(/\.[^.]+$/, '').slice(0, 24), y: -0.25, s: 1.1 });
+      const imgEl = { type: 'image', imgId: id, name: file.name.replace(/\.[^.]+$/, '').slice(0, 24), y: -0.25, s: 1.1 };
+      const maxS = maxScaleForElement(imgEl, state.product.printSpace);
+      imgEl.s = Math.min(imgEl.s, maxS * 0.92);
+      addElement(imgEl);
     } catch {
       toast('No se pudo leer la imagen');
     } finally {
@@ -439,7 +471,8 @@ export function initUI(viewer) {
       card.append(range(el, 'strokeW', 'Grosor del contorno', 0, 14, 0.5));
     }
 
-    card.append(range(el, 's', 'Tamaño', 0.1, 4.5, 0.01, (v) => Math.round(v * 100) + '%'));
+    const maxS = +Math.min(8, maxScaleForElement(el, state.product.printSpace)).toFixed(2);
+    card.append(range(el, 's', 'Tamaño', 0.1, Math.max(0.2, maxS), 0.01, (v) => Math.round(v * 100) + '%'));
     card.append(range(el, 'rot', 'Rotación', -180, 180, 1, (v) => v + '°'));
     card.append(range(el, 'opacity', 'Opacidad', 0.1, 1, 0.01, (v) => Math.round(v * 100) + '%'));
 
@@ -590,8 +623,9 @@ export function initUI(viewer) {
   const describe = (p) => {
     const line = getLine(p.line);
     const ref = getReference(p.line, p.reference);
+    const sp = getPrintSpace(p.printSpace);
     const collarPart = ref.customCollar ? ` · Cuello ${colorLabel(p.collarColor)}` : '';
-    return `${line.label} · ${ref.label} · ${p.audience} · Talla ${p.size} · ${colorLabel(p.color)}${collarPart}`;
+    return `${line.label} · ${ref.label} · ${p.audience} · Talla ${p.size} · ${colorLabel(p.color)}${collarPart} · Espacio ${sp.label} (${sp.desc})`;
   };
 
   function renderCart() {
