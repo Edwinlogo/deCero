@@ -30,9 +30,9 @@ async function boot() {
     ...CONFIG.fonts.map((f) => document.fonts.load(`100px "${f.family}"`).catch(() => null)),
   ]);
 
-  // Recupera el borrador anterior (v2) o carga el preset inicial Pro
+  // Recupera el borrador anterior (v3) o carga el diseño inicial
   const draft = await kvGet('draft', null);
-  if (draft && draft.v >= 2 && (draft.elements?.front?.length || draft.elements?.back?.length || draft.product)) {
+  if (draft && draft.v >= 3 && (draft.elements?.front?.length || draft.elements?.back?.length || draft.product)) {
     await loadDesign(draft);
   } else {
     // Diseño inicial limpio estilo estudio

@@ -5,6 +5,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { ATLAS_SIZE, paintAtlas, uvToDesign, hitHandle, hitElement } from './render2d.js';
 import { state, on, emit, selected, selectElement, removeElement, commit, changed } from './state.js';
+import { getReference } from './config.js';
 
 function createSoftShadowTexture() {
   const c = document.createElement('canvas');
@@ -175,8 +176,26 @@ export function createViewer(container) {
   );
 
   function applyProduct() {
-    const oversize = state.product.fit === 'oversize';
-    targetScaleVec.set(oversize ? 1.07 : 1, oversize ? 1.03 : 1, oversize ? 1.08 : 1);
+    const ref = getReference(state.product.line, state.product.reference);
+    switch (ref.fit) {
+      case 'oversize':
+        targetScaleVec.set(1.08, 1.04, 1.09);
+        break;
+      case 'heavy':
+        targetScaleVec.set(1.03, 1.01, 1.04);
+        break;
+      case 'fitted':
+        targetScaleVec.set(0.94, 0.98, 0.94);
+        break;
+      case 'crop':
+        targetScaleVec.set(0.96, 0.8, 0.95);
+        break;
+      case 'kids':
+        targetScaleVec.set(0.88, 0.88, 0.88);
+        break;
+      default:
+        targetScaleVec.set(1, 1, 1);
+    }
   }
 
   // ---------- Pintado de textura ----------

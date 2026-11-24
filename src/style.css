@@ -88,6 +88,7 @@ h2, h3 { margin: 0; }
 }
 .chip:hover { background: var(--accent-soft); color: var(--accent); }
 .chip.active { background: #0f172a; color: #fff; }
+.chip.icon-chip { width: 32px; height: 30px; padding: 0; justify-content: center; }
 .chip-sep { width: 1px; height: 18px; background: var(--line); margin: 0 2px; flex: none; }
 .bg-dots { display: flex; align-items: center; gap: 5px; padding: 0 4px; }
 .bg-dot {
@@ -144,40 +145,30 @@ h2, h3 { margin: 0; }
 .row.between { justify-content: space-between; margin-top: 16px; margin-bottom: 8px; }
 .row.gap { gap: 8px; }
 
-/* Presets */
-.presets-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.preset-card {
-  border: 1px solid var(--line); background: #fff; border-radius: 11px; padding: 8px; display: grid; gap: 6px;
-  text-align: left; transition: border-color .15s, transform .1s, box-shadow .15s;
+/* Referencias y controles de prenda */
+.ref-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.ref-btn {
+  border: 1px solid var(--line); background: #fff; border-radius: 10px; padding: 10px 11px; text-align: left;
+  display: grid; gap: 3px; transition: border-color .15s, background .15s, box-shadow .15s;
 }
-.preset-card:hover { border-color: var(--accent); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(15,23,42,.06); }
-.preset-swatch {
-  height: 28px; border-radius: 7px; border: 1px solid rgba(0,0,0,.08); display: flex; overflow: hidden;
-}
-.preset-swatch span { flex: 1; }
-.preset-card small { font-size: 11.5px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ref-btn:hover { border-color: #93c5fd; background: #f8fafc; }
+.ref-btn.active { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 2px 8px rgba(37,99,235,.12); }
+.ref-btn b { font-size: 13px; font-weight: 600; color: var(--ink); line-height: 1.25; }
+.ref-btn.active b { color: var(--accent); }
+.ref-btn small { font-size: 11.5px; color: var(--muted); font-weight: 500; }
 
-/* Zonas y Swatches */
-.seg { display: flex; background: var(--bg); border-radius: 10px; padding: 3px; gap: 3px; margin-bottom: 10px; }
-.seg button { flex: 1; border: 0; background: transparent; padding: 7px 4px; border-radius: 8px; font-weight: 600; font-size: 12.5px; color: var(--muted); }
+/* Segmentados y Swatches */
+.seg { display: flex; background: var(--bg); border-radius: 10px; padding: 3px; gap: 3px; margin-bottom: 6px; }
+.seg button { flex: 1; border: 0; background: transparent; padding: 7px 6px; border-radius: 8px; font-weight: 600; font-size: 12.5px; color: var(--muted); }
 .seg button.active { background: #fff; color: var(--ink); box-shadow: 0 1px 4px rgba(0,0,0,.1); }
 
 .swatches { display: grid; grid-template-columns: repeat(9, 1fr); gap: 7px; }
 .swatch {
-  aspect-ratio: 1; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(15,23,42,.15); padding: 0; position: relative; transition: transform .1s;
+  aspect-ratio: 1; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(15,23,42,.16); padding: 0; position: relative; transition: transform .1s;
 }
 .swatch:hover { transform: scale(1.12); }
 .swatch.active { box-shadow: 0 0 0 2.5px var(--accent); }
 .color-name { margin-top: 7px; font-size: 12.5px; color: var(--muted); font-weight: 500; }
-
-/* Patrones */
-.pattern-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-.pattern-btn {
-  border: 1px solid var(--line); background: #fff; border-radius: 10px; padding: 10px 12px; font-weight: 600; font-size: 13px;
-  text-align: left; display: flex; align-items: center; justify-content: space-between; transition: border-color .15s, background .15s;
-}
-.pattern-btn:hover { border-color: #93c5fd; background: #f8fafc; }
-.pattern-btn.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 
 .sizes { display: flex; flex-wrap: wrap; gap: 7px; }
 .sizes button { min-width: 48px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: #fff; font-weight: 600; font-size: 13px; }

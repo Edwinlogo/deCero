@@ -1,6 +1,7 @@
 // Motor de texturizado 2D (Atlas 2048x2048) para el modelo 3D shirt_baked.glb.
-// Mapea zonas de confección (frente, espalda, mangas, cuello), patrones sublimados y estampados.
+// Pinta color de prenda, color de cuello (para referencias de cuello en color) y estampados HD.
 import { images } from './state.js';
+import { getReference } from './config.js';
 
 export const ATLAS_SIZE = 2048;
 export const UV_UNIT = 0.165; // 1 unidad de diseño = 0.165 en espacio UV (proporción 1:1)
@@ -254,144 +255,6 @@ export function drawElement(ctx, el, ppu = PPU, cx = 0, cy = 0) {
   ctx.restore();
 }
 
-// ---------- Patrones textiles estilo Spized ----------
-function drawPattern(ctx, rect, pattern, color, alpha) {
-  if (!pattern || pattern === 'solid' || alpha <= 0) return;
-  const x = rect.u0 * ATLAS_SIZE;
-  const y = rect.v0 * ATLAS_SIZE;
-  const w = (rect.u1 - rect.u0) * ATLAS_SIZE;
-  const h = (rect.v1 - rect.v0) * ATLAS_SIZE;
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(x, y, w, h);
-  ctx.clip();
-  ctx.globalAlpha = alpha;
-  ctx.fillStyle = color;
-  ctx.strokeStyle = color;
-
-  switch (pattern) {
-    case 'gradient-v': {
-      const g = ctx.createLinearGradient(x, y + h * 0.15, x, y + h * 0.95);
-      g.addColorStop(0, 'rgba(0,0,0,0)');
-      g.addColorStop(1, color);
-      ctx.fillStyle = g;
-      ctx.fillRect(x, y, w, h);
-      break;
-    }
-    case 'gradient-d': {
-      const g = ctx.createLinearGradient(x, y, x + w, y + h);
-      g.addColorStop(0, 'rgba(0,0,0,0)');
-      g.addColorStop(0.55, color);
-      g.addColorStop(1, color);
-      ctx.fillStyle = g;
-      ctx.fillRect(x, y, w, h);
-      break;
-    }
-    case 'stripes-v': {
-      const n = 9;
-      const step = w / n;
-      for (let i = 0; i < n; i += 2) {
-        ctx.fillRect(x + i * step + step * 0.15, y, step * 0.45, h);
-      }
-      break;
-    }
-    case 'stripes-h': {
-      const n = 10;
-      const step = h / n;
-      for (let i = 1; i < n; i += 2) {
-        ctx.fillRect(x, y + i * step, w, step * 0.42);
-      }
-      break;
-    }
-    case 'band-chest': {
-      const by = y + h * 0.34;
-      const bh = h * 0.18;
-      ctx.fillRect(x, by, w, bh);
-      ctx.fillRect(x, by - bh * 0.22, w, bh * 0.1);
-      ctx.fillRect(x, by + bh * 1.12, w, bh * 0.1);
-      break;
-    }
-    case 'chevron': {
-      const cx = x + w * 0.5;
-      for (let k = 0; k < 3; k++) {
-        const y0 = y + h * (0.28 + k * 0.13);
-        const thick = h * 0.065;
-        ctx.beginPath();
-        ctx.moveTo(x, y0 - h * 0.12);
-        ctx.lineTo(cx, y0 + h * 0.08);
-        ctx.lineTo(x + w, y0 - h * 0.12);
-        ctx.lineTo(x + w, y0 - h * 0.12 + thick);
-        ctx.lineTo(cx, y0 + h * 0.08 + thick);
-        ctx.lineTo(x, y0 - h * 0.12 + thick);
-        ctx.closePath();
-        ctx.fill();
-      }
-      break;
-    }
-    case 'split': {
-      ctx.beginPath();
-      ctx.moveTo(x + w * 0.62, y);
-      ctx.lineTo(x + w, y);
-      ctx.lineTo(x + w, y + h);
-      ctx.lineTo(x + w * 0.18, y + h);
-      ctx.closePath();
-      ctx.fill();
-      // línea acento paralela
-      ctx.lineWidth = w * 0.022;
-      ctx.beginPath();
-      ctx.moveTo(x + w * 0.55, y);
-      ctx.lineTo(x + w * 0.11, y + h);
-      ctx.stroke();
-      break;
-    }
-    case 'hex': {
-      const r = 34;
-      const dx = r * 1.5;
-      const dy = r * Math.sqrt(3);
-      ctx.lineWidth = 3.5;
-      for (let row = -1; row < h / dy + 2; row++) {
-        for (let col = -1; col < w / dx + 2; col++) {
-          const hx = x + col * dx;
-          const hy = y + row * dy + (col % 2 ? dy / 2 : 0);
-          ctx.beginPath();
-          for (let i = 0; i < 6; i++) {
-            const a = (Math.PI / 3) * i;
-            const px = hx + (r - 4) * Math.cos(a);
-            const py = hy + (r - 4) * Math.sin(a);
-            i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
-          }
-          ctx.closePath();
-          ctx.stroke();
-        }
-      }
-      break;
-    }
-    case 'camo': {
-      // Polígonos geométricos modernos deterministas
-      let seed = 42;
-      const rnd = () => {
-        seed = (seed * 1664525 + 1013904223) % 4294967296;
-        return seed / 4294967296;
-      };
-      for (let i = 0; i < 48; i++) {
-        const px = x + rnd() * w;
-        const py = y + rnd() * h;
-        const s = 45 + rnd() * 130;
-        ctx.beginPath();
-        ctx.moveTo(px, py);
-        ctx.lineTo(px + (rnd() - 0.3) * s, py + (rnd() - 0.5) * s);
-        ctx.lineTo(px + (rnd() - 0.5) * s, py + (rnd() + 0.2) * s);
-        ctx.lineTo(px - rnd() * s * 0.7, py + (rnd() - 0.2) * s);
-        ctx.closePath();
-        ctx.fill();
-      }
-      break;
-    }
-  }
-  ctx.restore();
-}
-
 // ---------- Guías de edición ----------
 const PAD = 0.04;
 const HANDLE_R = 0.065;
@@ -487,39 +350,23 @@ function drawPrintArea(ctx, side) {
 /** Pinta el atlas completo 2048x2048 de la camiseta 3D. */
 export function paintAtlas(ctx, { elements, product, guides = true, selectedId = null }) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  const z = product.zones || {};
-  const base = product.color || '#f5f5f2';
+  const base = product.color || '#f7f7f5';
+  const ref = getReference(product.line, product.reference);
 
-  // Fondo base para cubrir costuras/márgenes de sangrado
-  ctx.fillStyle = z.front || base;
+  // Color base de toda la prenda
+  ctx.fillStyle = base;
   ctx.fillRect(0, 0, ATLAS_SIZE, ATLAS_SIZE);
 
-  // Relleno por zona de confección
-  const fillZone = (rect, col) => {
-    ctx.fillStyle = col || base;
+  // Cuello de color independiente para referencias "Cuello colores normal / crop top"
+  if (ref.customCollar && product.collarColor) {
+    const colRect = UV_ZONES.collar;
+    ctx.fillStyle = product.collarColor;
     ctx.fillRect(
-      rect.u0 * ATLAS_SIZE,
-      rect.v0 * ATLAS_SIZE,
-      (rect.u1 - rect.u0) * ATLAS_SIZE,
-      (rect.v1 - rect.v0) * ATLAS_SIZE,
+      colRect.u0 * ATLAS_SIZE,
+      colRect.v0 * ATLAS_SIZE,
+      (colRect.u1 - colRect.u0) * ATLAS_SIZE,
+      (colRect.v1 - colRect.v0) * ATLAS_SIZE,
     );
-  };
-  fillZone(UV_ZONES.front, z.front || base);
-  fillZone(UV_ZONES.back, z.back || base);
-  fillZone(UV_ZONES.sleeveR, z.sleeveR || base);
-  fillZone(UV_ZONES.sleeveL, z.sleeveL || base);
-  fillZone(UV_ZONES.collar, z.collar || base);
-
-  // Patrón sublimado sobre cuerpo (frente y espalda) y sutil en mangas si aplica
-  if (product.pattern && product.pattern !== 'solid') {
-    const pCol = product.patternColor || '#132448';
-    const pAlpha = product.patternAlpha ?? 0.85;
-    drawPattern(ctx, UV_ZONES.front, product.pattern, pCol, pAlpha);
-    drawPattern(ctx, UV_ZONES.back, product.pattern, pCol, pAlpha);
-    if (['hex', 'camo', 'gradient-v', 'stripes-h'].includes(product.pattern)) {
-      drawPattern(ctx, UV_ZONES.sleeveR, product.pattern, pCol, pAlpha * 0.7);
-      drawPattern(ctx, UV_ZONES.sleeveL, product.pattern, pCol, pAlpha * 0.7);
-    }
   }
 
   // Estampados en frente y espalda (recortados a su zona UV para no invadir la otra cara)

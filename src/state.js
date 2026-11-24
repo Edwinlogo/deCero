@@ -1,5 +1,5 @@
 // Estado global del editor + eventos + historial (deshacer / rehacer).
-import { CONFIG } from './config.js';
+import { CONFIG, getLine, getReference, getSizesForAudience } from './config.js';
 
 const listeners = {};
 export const on = (ev, fn) => {
@@ -8,22 +8,48 @@ export const on = (ev, fn) => {
 export const emit = (ev, ...args) => (listeners[ev] || []).forEach((f) => f(...args));
 
 export function defaultProduct() {
-  const c = CONFIG.colors[0].hex;
+  const white = CONFIG.colors.find((c) => c.name === 'Blanco')?.hex || '#f7f7f5';
+  const black = CONFIG.colors.find((c) => c.name === 'Negro')?.hex || '#17181b';
   return {
-    color: c,
-    zones: { front: c, back: c, sleeveL: c, sleeveR: c, collar: c },
-    pattern: 'solid',
-    patternColor: '#132448',
-    patternAlpha: 0.85,
-    fit: 'regular',
+    line: 'basica',
+    audience: 'Hombre',
+    reference: 'algodon-175',
+    color: white,
+    collarColor: black,
     size: 'M',
     qty: 1,
   };
 }
 
+export function normalizeProduct(p) {
+  const line = getLine(p.line);
+  p.line = line.id;
+  if (!line.audiences.includes(p.audience)) {
+    p.audience = line.audiences[0];
+  }
+  let ref = line.references.find((r) => r.id === p.reference);
+  if (!ref || !ref.audiences.includes(p.audience)) {
+    ref = line.references.find((r) => r.audiences.includes(p.audience)) || line.references[0];
+    p.reference = ref.id;
+    if (!ref.audiences.includes(p.audience)) {
+      p.audience = ref.audiences[0];
+    }
+  }
+  const sizes = getSizesForAudience(p.audience);
+  if (!sizes.includes(p.size)) {
+    p.size = p.audience === 'Niños' ? sizes[1] : 'M';
+  }
+  if (!CONFIG.colors.some((c) => c.hex.toLowerCase() === (p.color || '').toLowerCase())) {
+    p.color = CONFIG.colors.find((c) => c.name === 'Blanco')?.hex || CONFIG.colors[0].hex;
+  }
+  if (!CONFIG.colors.some((c) => c.hex.toLowerCase() === (p.collarColor || '').toLowerCase())) {
+    p.collarColor = CONFIG.colors.find((c) => c.name === 'Negro')?.hex || CONFIG.colors[0].hex;
+  }
+  return p;
+}
+
 export const state = {
   product: defaultProduct(),
-  activeZone: 'all', // 'all' | 'front' | 'back' | 'sleeves' | 'collar'
   elements: { front: [], back: [] },
   selectedId: null,
   side: 'front', // lado que mira a la cámara ('front' | 'back')
@@ -152,13 +178,12 @@ export function clearSide(side) {
 }
 
 // ---------- Precio ----------
-export function priceInfo() {
+export function priceInfo(product = state.product, elements = state.elements) {
   const P = CONFIG.prices;
-  const p = state.product;
-  const lines = [{ label: 'Camisa base Pro', amount: P.base }];
-  if (p.pattern && p.pattern !== 'solid') lines.push({ label: 'Sublimación / patrón', amount: P.pattern });
-  if (p.fit === 'oversize') lines.push({ label: 'Ajuste oversize', amount: P.oversize });
-  const sides = ['front', 'back'].filter((s) => state.elements[s].some((e) => !e.hidden));
+  const line = getLine(product.line);
+  const ref = getReference(product.line, product.reference);
+  const lines = [{ label: `${line.shortLabel} · ${ref.label}`, amount: ref.price }];
+  const sides = ['front', 'back'].filter((s) => elements[s].some((e) => !e.hidden));
   if (sides.length) {
     lines.push({
       label: `Estampado ${sides.length === 2 ? 'frente + espalda' : sides[0] === 'front' ? 'frente' : 'espalda'}`,
@@ -166,7 +191,7 @@ export function priceInfo() {
     });
   }
   const unit = lines.reduce((a, l) => a + l.amount, 0);
-  const qty = p.qty;
+  const qty = product.qty;
   const discount = qty >= P.bulkMinQty ? P.bulkDiscount : 0;
   const subtotal = unit * qty;
   const total = subtotal * (1 - discount);
@@ -184,7 +209,7 @@ export function usedImages(elements = state.elements) {
 
 export function serializeDesign() {
   return {
-    v: 2,
+    v: 3,
     product: JSON.parse(JSON.stringify(state.product)),
     elements: JSON.parse(JSON.stringify(state.elements)),
     images: usedImages(),
@@ -217,20 +242,7 @@ export async function loadDesign(data) {
     }
   }
   const base = defaultProduct();
-  const incoming = data.product || {};
-  const mainColor = incoming.color || base.color;
-  state.product = {
-    ...base,
-    ...incoming,
-    zones: {
-      front: mainColor,
-      back: mainColor,
-      sleeveL: mainColor,
-      sleeveR: mainColor,
-      collar: mainColor,
-      ...(incoming.zones || {}),
-    },
-  };
+  state.product = normalizeProduct({ ...base, ...(data.product || {}) });
   state.elements = { front: data.elements?.front || [], back: data.elements?.back || [] };
   state.selectedId = null;
   resetHistory();

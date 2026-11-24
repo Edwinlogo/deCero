@@ -1,7 +1,7 @@
-// Interfaz de usuario: zonas, patrones, presets, capas, propiedades, carrito, pedidos y exportación.
-import { CONFIG, money } from './config.js';
+// Interfaz de usuario: líneas de producto, referencias, colores, capas, propiedades, carrito, pedidos y exportación.
+import { CONFIG, getLine, getReference, getSizesForAudience, money } from './config.js';
 import {
-  state, defaultProduct, on, emit, images, selected, addElement, removeElement, selectElement, duplicateElement, moveLayer, clearSide,
+  state, defaultProduct, normalizeProduct, on, emit, images, selected, addElement, removeElement, selectElement, duplicateElement, moveLayer, clearSide,
   commit, changed, undo, redo, canUndo, canRedo, priceInfo, registerImage, newId, serializeDesign, loadDesign, loadImage,
 } from './state.js';
 import { exportArt } from './render2d.js';
@@ -63,6 +63,9 @@ const SHAPE_ICONS = {
 const shapeSvg = (t) => `<svg viewBox="0 0 24 24">${SHAPE_ICONS[t]}</svg>`;
 const SHAPE_GLYPH = { rect: '▭', circle: '●', triangle: '▲', star: '★', heart: '♥', bolt: '⚡' };
 
+const PLAY_SVG = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6,4 20,12 6,20"/></svg>';
+const PAUSE_SVG = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>';
+
 export function initUI(viewer) {
   const stage = $('#stage');
 
@@ -73,144 +76,110 @@ export function initUI(viewer) {
   }
   $$('.tab').forEach((t) => t.addEventListener('click', () => showTab(t.dataset.tab)));
 
-  // ---------------- Presets ----------------
-  const presetsGrid = $('#presets-grid');
-  CONFIG.presets.forEach((pr) => {
-    const z = pr.product.zones;
-    presetsGrid.append(
-      h('button', {
-        class: 'preset-card',
-        onclick: () => {
-          Object.assign(state.product, {
-            ...pr.product,
-            zones: { ...pr.product.zones },
-          });
-          if (pr.bg) setStageBg(pr.bg);
-          emit('product');
-          toast(`Estilo «${pr.name}» aplicado`);
-        },
-      },
-      h('div', { class: 'preset-swatch' },
-        h('span', { style: `background:${z.front}` }),
-        h('span', { style: `background:${pr.product.pattern !== 'solid' ? pr.product.patternColor : z.sleeveL}` }),
-        h('span', { style: `background:${z.collar}` }),
-      ),
-      h('small', { text: pr.name })),
-    );
-  });
-
-  // ---------------- Zonas y Colores ----------------
-  const segZone = $('#seg-zone');
-  CONFIG.zones.forEach((z) => {
-    segZone.append(h('button', {
-      'data-z': z.id,
-      text: z.label,
+  // ---------------- Línea de producto, Público, Referencia y Colores ----------------
+  const segLine = $('#seg-line');
+  CONFIG.productLines.forEach((line) => {
+    segLine.append(h('button', {
+      'data-line': line.id,
+      text: line.shortLabel,
+      title: line.label,
       onclick: () => {
-        state.activeZone = z.id;
-        if (z.id === 'front') viewer.setView('front');
-        else if (z.id === 'back') viewer.setView('back');
-        else if (z.id === 'sleeves') viewer.setView('left');
-        renderProduct();
-      },
-    }));
-  });
-
-  function currentZoneColor() {
-    const p = state.product;
-    const z = p.zones;
-    switch (state.activeZone) {
-      case 'front': return z.front;
-      case 'back': return z.back;
-      case 'sleeves': return z.sleeveL;
-      case 'collar': return z.collar;
-      default: return p.color;
-    }
-  }
-
-  function applyZoneColor(hex) {
-    const p = state.product;
-    const z = p.zones;
-    switch (state.activeZone) {
-      case 'front': z.front = hex; break;
-      case 'back': z.back = hex; break;
-      case 'sleeves': z.sleeveL = hex; z.sleeveR = hex; break;
-      case 'collar': z.collar = hex; break;
-      default:
-        p.color = hex;
-        z.front = z.back = z.sleeveL = z.sleeveR = z.collar = hex;
-        break;
-    }
-    emit('product');
-  }
-
-  const sw = $('#swatches');
-  CONFIG.colors.forEach((c) => {
-    sw.append(h('button', {
-      class: 'swatch', style: `background:${c.hex}`, title: c.name, 'data-hex': c.hex, 'aria-label': c.name,
-      onclick: () => applyZoneColor(c.hex),
-    }));
-  });
-  const custom = h('input', { type: 'color', hidden: true, value: '#2563eb', oninput: (e) => applyZoneColor(e.target.value) });
-  sw.append(h('label', { class: 'swatch', title: 'Color personalizado', style: 'background:conic-gradient(red,yellow,lime,aqua,blue,magenta,red);cursor:pointer' }, custom));
-
-  // ---------------- Patrones (Spized) ----------------
-  const patternGrid = $('#pattern-grid');
-  CONFIG.patterns.forEach((pt) => {
-    patternGrid.append(h('button', {
-      class: 'pattern-btn',
-      'data-pat': pt.id,
-      text: pt.label,
-      onclick: () => {
-        state.product.pattern = pt.id;
+        state.product.line = line.id;
+        normalizeProduct(state.product);
         emit('product');
       },
     }));
   });
 
-  const patSw = $('#pattern-swatches');
+  const sw = $('#swatches');
   CONFIG.colors.forEach((c) => {
-    patSw.append(h('button', {
-      class: 'swatch', style: `background:${c.hex}`, title: c.name, 'data-phex': c.hex, 'aria-label': c.name,
-      onclick: () => { state.product.patternColor = c.hex; emit('product'); },
+    sw.append(h('button', {
+      class: 'swatch', style: `background:${c.hex}`, title: c.name, 'data-hex': c.hex, 'aria-label': c.name,
+      onclick: () => { state.product.color = c.hex; emit('product'); },
     }));
   });
-  const customPat = h('input', { type: 'color', hidden: true, value: '#06b6d4', oninput: (e) => { state.product.patternColor = e.target.value; emit('product'); } });
-  patSw.append(h('label', { class: 'swatch', title: 'Color libre', style: 'background:conic-gradient(red,yellow,lime,aqua,blue,magenta,red);cursor:pointer' }, customPat));
 
-  $('#pattern-alpha').addEventListener('input', (e) => {
-    state.product.patternAlpha = +e.target.value;
-    $('#pattern-alpha-out').textContent = Math.round(state.product.patternAlpha * 100) + '%';
-    emit('product');
+  const collarSw = $('#collar-swatches');
+  CONFIG.colors.forEach((c) => {
+    collarSw.append(h('button', {
+      class: 'swatch', style: `background:${c.hex}`, title: c.name, 'data-chex': c.hex, 'aria-label': c.name,
+      onclick: () => { state.product.collarColor = c.hex; emit('product'); },
+    }));
   });
 
-  // ---------------- Ajuste y Tallas ----------------
-  $('#sizes').append(...CONFIG.sizes.map((s) => h('button', { 'data-v': s, text: s, onclick: () => setProduct({ size: s }) })));
-  $$('#seg-fit button').forEach((b) => b.addEventListener('click', () => setProduct({ fit: b.dataset.v })));
   $('#tab-product .muted.small').textContent = $('#tab-product .muted.small').textContent.replace('{{min}}', CONFIG.prices.bulkMinQty);
 
-  function setProduct(patch) {
-    Object.assign(state.product, patch);
-    emit('product');
-  }
-
   function renderProduct() {
-    const p = state.product;
-    $$('#seg-zone button').forEach((b) => b.classList.toggle('active', b.dataset.z === state.activeZone));
+    const p = normalizeProduct(state.product);
+    const line = getLine(p.line);
+    const ref = getReference(p.line, p.reference);
 
-    const activeHex = (currentZoneColor() || p.color).toLowerCase();
+    // Línea de producto
+    $$('#seg-line button').forEach((b) => b.classList.toggle('active', b.dataset.line === line.id));
+
+    // Público disponible para esta línea
+    const segAud = $('#seg-audience');
+    segAud.innerHTML = '';
+    line.audiences.forEach((aud) => {
+      segAud.append(h('button', {
+        class: aud === p.audience ? 'active' : '',
+        text: aud,
+        onclick: () => {
+          state.product.audience = aud;
+          normalizeProduct(state.product);
+          emit('product');
+        },
+      }));
+    });
+
+    // Referencias de esta línea
+    const refGrid = $('#ref-grid');
+    refGrid.innerHTML = '';
+    line.references.forEach((r) => {
+      const audNote = r.audiences.length === 1 ? r.audiences[0] : r.audiences.join(' / ');
+      refGrid.append(h('button', {
+        class: 'ref-btn' + (r.id === ref.id ? ' active' : ''),
+        onclick: () => {
+          state.product.reference = r.id;
+          if (!r.audiences.includes(state.product.audience)) {
+            state.product.audience = r.audiences[0];
+          }
+          normalizeProduct(state.product);
+          emit('product');
+        },
+      },
+      h('b', { text: r.label }),
+      h('small', { text: `${audNote} · ${money(r.price)}` })));
+    });
+
+    // Color principal (solo las 17 opciones)
+    const activeHex = p.color.toLowerCase();
     $$('#swatches .swatch[data-hex]').forEach((b) => b.classList.toggle('active', b.dataset.hex.toLowerCase() === activeHex));
     const known = CONFIG.colors.find((c) => c.hex.toLowerCase() === activeHex);
-    const zoneLabel = CONFIG.zones.find((z) => z.id === state.activeZone)?.label || 'Toda';
-    $('#color-name').textContent = `${zoneLabel}: ${known ? known.name : activeHex}`;
+    $('#color-name').textContent = known ? known.name : p.color;
 
-    $$('#pattern-grid .pattern-btn').forEach((b) => b.classList.toggle('active', b.dataset.pat === p.pattern));
-    $('#pattern-controls').hidden = p.pattern === 'solid';
-    $$('#pattern-swatches .swatch[data-phex]').forEach((b) => b.classList.toggle('active', b.dataset.phex.toLowerCase() === (p.patternColor || '').toLowerCase()));
-    $('#pattern-alpha').value = p.patternAlpha ?? 0.85;
-    $('#pattern-alpha-out').textContent = Math.round((p.patternAlpha ?? 0.85) * 100) + '%';
+    // Color del cuello (solo en referencias Cuello colores normal / crop top)
+    const collarBlock = $('#collar-color-block');
+    collarBlock.hidden = !ref.customCollar;
+    if (ref.customCollar) {
+      const cHex = (p.collarColor || p.color).toLowerCase();
+      $$('#collar-swatches .swatch[data-chex]').forEach((b) => b.classList.toggle('active', b.dataset.chex.toLowerCase() === cHex));
+      const cKnown = CONFIG.colors.find((c) => c.hex.toLowerCase() === cHex);
+      $('#collar-color-name').textContent = cKnown ? cKnown.name : p.collarColor;
+    }
 
-    $$('#seg-fit button').forEach((b) => b.classList.toggle('active', b.dataset.v === p.fit));
-    $$('#sizes button').forEach((b) => b.classList.toggle('active', b.dataset.v === p.size));
+    // Tallas (niños vs adulto)
+    const sizesBox = $('#sizes');
+    sizesBox.innerHTML = '';
+    const sizes = getSizesForAudience(p.audience);
+    sizes.forEach((s) => {
+      sizesBox.append(h('button', {
+        class: s === p.size ? 'active' : '',
+        text: s,
+        onclick: () => { state.product.size = s; emit('product'); },
+      }));
+    });
+
     renderPrice();
   }
 
@@ -223,7 +192,7 @@ export function initUI(viewer) {
     if (info.discount) ul.append(h('li', { class: 'disc' }, h('span', { text: `Descuento por volumen (${Math.round(info.discount * 100)}%)` }), h('span', { text: '−' + money(info.subtotal * info.discount) })));
     ul.append(h('li', { class: 'total' }, h('span', { text: 'Total' }), h('span', { text: money(info.total) })));
     $('#buy-total').textContent = money(info.total);
-    $('#buy-sub').textContent = `${info.qty} × ${money(info.unit)} · talla ${state.product.size}`;
+    $('#buy-sub').textContent = `${info.qty} × ${money(info.unit)} · ${state.product.audience} · talla ${state.product.size}`;
     $('#qty-val').textContent = info.qty;
   }
   $('#qty-minus').onclick = () => { state.product.qty = Math.max(1, state.product.qty - 1); renderPrice(); };
@@ -236,9 +205,8 @@ export function initUI(viewer) {
   $('#sticker-grid').append(...CONFIG.stickers.map((c) => h('button', { text: c, onclick: () => addElement({ type: 'emoji', char: c }) })));
 
   $('#btn-add-text').onclick = () => {
-    const baseHex = state.side === 'back' ? state.product.zones.back : state.product.zones.front;
     addElement({
-      type: 'text', text: 'TU TEXTO', font: 'Anton', color: contrastInk(baseHex), strokeColor: '#000000',
+      type: 'text', text: 'TU TEXTO', font: 'Anton', color: contrastInk(state.product.color), strokeColor: '#000000',
       strokeW: 0, curve: 0, spacing: 2, align: 'center', y: -0.25, s: 1.2,
     });
   };
@@ -246,7 +214,7 @@ export function initUI(viewer) {
   $('#btn-add-chest').onclick = () => {
     viewer.setView('front');
     addElement({
-      type: 'shape', shape: 'star', fill: '#facc15', stroke: '#0f172a', strokeW: 3, ratio: 1, radius: 0.15,
+      type: 'shape', shape: 'star', fill: '#f2c629', stroke: '#17181b', strokeW: 3, ratio: 1, radius: 0.15,
       x: 0.36, y: -0.58, s: 0.55,
     }, 'front');
     toast('Escudo añadido en el pecho izquierdo');
@@ -254,7 +222,7 @@ export function initUI(viewer) {
 
   $('#btn-add-dorsal').onclick = () => {
     viewer.setView('back');
-    const ink = contrastInk(state.product.zones.back);
+    const ink = contrastInk(state.product.color);
     addElement({
       type: 'text', text: 'DECERO', font: 'Bebas Neue', color: ink, strokeColor: '#000000',
       strokeW: 0, curve: 0, spacing: 8, align: 'center', x: 0, y: -0.62, s: 1.35,
@@ -267,9 +235,8 @@ export function initUI(viewer) {
   };
 
   function addShape(type) {
-    const baseHex = state.side === 'back' ? state.product.zones.back : state.product.zones.front;
-    const dark = lum(baseHex) < 0.5;
-    addElement({ type: 'shape', shape: type, fill: dark ? '#fbbf24' : '#e11d48', stroke: '#000000', strokeW: 0, ratio: 1, radius: 0.15 });
+    const dark = lum(state.product.color) < 0.5;
+    addElement({ type: 'shape', shape: type, fill: dark ? '#f2c629' : '#c81e2b', stroke: '#000000', strokeW: 0, ratio: 1, radius: 0.15 });
   }
 
   async function processFile(file) {
@@ -371,7 +338,7 @@ export function initUI(viewer) {
     return h('label', { class: 'field' }, h('span', { class: 'lbl' }, label, out), input);
   }
 
-  const QUICK = ['#ffffff', '#111111', '#e11d48', '#f59e0b', '#facc15', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'];
+  const QUICK = ['#ffffff', '#111111', '#c81e2b', '#f2c629', '#1f7a4c', '#2563c9', '#ec6b9e', '#661a2b', '#155e63', '#5c3b28'];
   function colorField(el, key, label) {
     const input = h('input', { type: 'color' });
     const sync = () => { input.value = /^#[0-9a-f]{6}$/i.test(el[key]) ? el[key] : '#000000'; };
@@ -507,8 +474,10 @@ export function initUI(viewer) {
     }
   });
   $('#btn-rotate').onclick = (e) => {
-    viewer.setAutoRotate(!viewer.autoRotate);
-    e.currentTarget.classList.toggle('active', viewer.autoRotate);
+    const next = !viewer.autoRotate;
+    viewer.setAutoRotate(next);
+    e.currentTarget.classList.toggle('active', next);
+    e.currentTarget.innerHTML = next ? PAUSE_SVG : PLAY_SVG;
   };
   $('#btn-guides').onclick = (e) => {
     state.guides = !state.guides;
@@ -558,9 +527,12 @@ export function initUI(viewer) {
   const dlgCart = $('#dlg-cart');
   const saveCart = () => kvSet('cart', cart);
   const cartTotal = () => cart.reduce((a, i) => a + i.total, 0);
+  const colorLabel = (hex) => CONFIG.colors.find((c) => c.hex.toLowerCase() === (hex || '').toLowerCase())?.name || hex;
   const describe = (p) => {
-    const pat = CONFIG.patterns.find((x) => x.id === p.pattern)?.label || 'Liso';
-    return `Talla ${p.size} · ${p.fit === 'oversize' ? 'Oversize' : 'Regular'} · Patrón ${pat}`;
+    const line = getLine(p.line);
+    const ref = getReference(p.line, p.reference);
+    const collarPart = ref.customCollar ? ` · Cuello ${colorLabel(p.collarColor)}` : '';
+    return `${line.label} · ${ref.label} · ${p.audience} · Talla ${p.size} · ${colorLabel(p.color)}${collarPart}`;
   };
 
   function renderCart() {
@@ -577,7 +549,7 @@ export function initUI(viewer) {
       const row = h('div', { class: 'cart-item' },
         h('div', { class: 'cart-thumbs' }, h('img', { src: it.thumbFront, alt: 'Frente' }), it.thumbBack && h('img', { src: it.thumbBack, alt: 'Espalda' })),
         h('div', { class: 'cart-info' },
-          h('b', { text: 'Camisa personalizada Pro' }),
+          h('b', { text: getReference(it.design.product.line, it.design.product.reference).label }),
           h('div', { class: 'meta', text: describe(it.design.product) + ` · estampado: ${it.sides.length === 2 ? 'frente y espalda' : it.sides[0] === 'front' ? 'frente' : it.sides[0] === 'back' ? 'espalda' : 'ninguno'}` }),
           h('div', { class: 'row' },
             h('div', { class: 'qty' },
@@ -593,15 +565,6 @@ export function initUI(viewer) {
       h('button', { class: 'btn primary big', text: 'Finalizar pedido', onclick: openCheckout }));
   }
 
-  function unitFor(design) {
-    const P = CONFIG.prices;
-    const p = design.product;
-    const sides = ['front', 'back'].filter((s) => design.elements[s].some((e) => !e.hidden));
-    return {
-      sides,
-      unit: P.base + (p.pattern && p.pattern !== 'solid' ? P.pattern : 0) + (p.fit === 'oversize' ? P.oversize : 0) + P.printSide * sides.length,
-    };
-  }
   function itemTotal(unit, qty) {
     const P = CONFIG.prices;
     return unit * qty * (qty >= P.bulkMinQty ? 1 - P.bulkDiscount : 1);
@@ -627,7 +590,7 @@ export function initUI(viewer) {
     btn.disabled = true;
     try {
       const design = serializeDesign();
-      const { sides, unit } = unitFor(design);
+      const { sides, unit } = priceInfo(design.product, design.elements);
       const jpg = (c) => c.toDataURL('image/jpeg', 0.88);
       const thumbFront = jpg(viewer.capture('front', 400));
       const thumbBack = sides.includes('back') ? jpg(viewer.capture('back', 400)) : null;
@@ -653,7 +616,7 @@ export function initUI(viewer) {
     dlgCheckout.showModal();
   }
   function orderText(order) {
-    const lines = order.items.map((i) => `• ${i.qty}× Camisa ${describe(i.design.product)} — ${money(i.total)}`);
+    const lines = order.items.map((i) => `• ${i.qty}× ${describe(i.design.product)} — ${money(i.total)}`);
     return `Hola, quiero confirmar mi pedido ${order.id} en ${CONFIG.storeName}:\n${lines.join('\n')}\nTotal: ${money(order.total)}\nNombre: ${order.customer.name}\nDirección: ${order.customer.address}`;
   }
   $('#checkout-form').addEventListener('submit', async (e) => {

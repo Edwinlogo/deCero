@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#111827" />
-    <meta name="description" content="deCero 3D · Configurador 3D profesional de camisas personalizadas con zonas, patrones, imágenes y textos en tiempo real." />
+    <meta name="description" content="deCero 3D · Configurador 3D profesional de camisas personalizadas." />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>deCero · Configurador 3D de Camisas</title>
@@ -36,7 +36,9 @@
             <button class="chip hide-xs" data-view="left">Izq</button>
             <button class="chip hide-xs" data-view="right">Der</button>
             <span class="chip-sep"></span>
-            <button class="chip" id="btn-rotate">360°</button>
+            <button class="chip icon-chip" id="btn-rotate" title="Girar 360°" aria-label="Girar 360°">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6,4 20,12 6,20"/></svg>
+            </button>
             <button class="chip active" id="btn-guides" title="Mostrar guías de edición">Guías</button>
             <div class="bg-dots" id="bg-dots" title="Ambiente de estudio"></div>
             <label class="chip bg-chip" title="Color de fondo libre">
@@ -52,26 +54,30 @@
         <aside class="panel">
           <nav class="tabs" id="tabs">
             <button class="tab active" data-tab="product">Prenda</button>
-            <button class="tab" data-tab="pattern">Patrón</button>
             <button class="tab" data-tab="add">Añadir</button>
             <button class="tab" data-tab="edit">Capas</button>
           </nav>
 
           <div class="tab-pages">
-            <!-- PRENDA Y ZONAS -->
+            <!-- PRENDA -->
             <section class="page active" id="tab-product">
-              <h3>Estilos rápidos</h3>
-              <div class="presets-grid" id="presets-grid"></div>
+              <h3>Línea de producto</h3>
+              <div class="seg" id="seg-line"></div>
 
-              <h3>Zona de color</h3>
-              <div class="seg" id="seg-zone"></div>
+              <h3>Público</h3>
+              <div class="seg" id="seg-audience"></div>
+
+              <h3>Referencia</h3>
+              <div class="ref-grid" id="ref-grid"></div>
+
+              <h3>Color</h3>
               <div class="swatches" id="swatches"></div>
               <div class="color-name" id="color-name"></div>
 
-              <h3>Ajuste</h3>
-              <div class="seg" id="seg-fit">
-                <button data-v="regular">Regular Fit</button>
-                <button data-v="oversize">Oversize</button>
+              <div id="collar-color-block" hidden>
+                <h3>Color del cuello</h3>
+                <div class="swatches" id="collar-swatches"></div>
+                <div class="color-name" id="collar-color-name"></div>
               </div>
 
               <h3>Talla</h3>
@@ -80,22 +86,6 @@
               <h3>Resumen de precio</h3>
               <ul class="price-lines" id="price-lines"></ul>
               <p class="muted small">Impresión DTF / Sublimación HD. Pedidos desde {{min}} unidades tienen descuento automático.</p>
-            </section>
-
-            <!-- PATRONES SUBLIMADOS (SPIZED) -->
-            <section class="page" id="tab-pattern">
-              <h3>Diseño de tela / Sublimación</h3>
-              <div class="pattern-grid" id="pattern-grid"></div>
-
-              <div id="pattern-controls">
-                <h3>Color del patrón</h3>
-                <div class="swatches" id="pattern-swatches"></div>
-
-                <label class="field" style="margin-top: 14px">
-                  <span class="lbl">Intensidad <output id="pattern-alpha-out">85%</output></span>
-                  <input type="range" id="pattern-alpha" min="0.1" max="1" step="0.05" value="0.85" />
-                </label>
-              </div>
             </section>
 
             <!-- AÑADIR -->

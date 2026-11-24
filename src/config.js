@@ -1,4 +1,4 @@
-// Configuración de la tienda y del configurador 3D.
+// Configuración de la tienda, líneas de producto, referencias, tallas y colores.
 export const CONFIG = {
   storeName: 'deCero 3D',
   currency: 'USD',
@@ -6,99 +6,46 @@ export const CONFIG = {
   // Número de WhatsApp con código de país, sin "+" (ej: '573001234567'). Si está vacío no se muestra el botón.
   whatsapp: '',
   prices: {
-    base: 22, // camisa base sublimación / algodón pro
-    pattern: 4, // extra por patrón sublimado
-    oversize: 3, // extra ajuste oversize
     printSide: 6, // por cada lado estampado (frente / espalda)
     bulkMinQty: 6, // descuento por volumen desde esta cantidad
     bulkDiscount: 0.12,
   },
-  sizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
-  zones: [
-    { id: 'all', label: 'Toda' },
-    { id: 'front', label: 'Frente' },
-    { id: 'back', label: 'Espalda' },
-    { id: 'sleeves', label: 'Mangas' },
-    { id: 'collar', label: 'Cuello' },
-  ],
-  patterns: [
-    { id: 'solid', label: 'Liso' },
-    { id: 'gradient-v', label: 'Degradado' },
-    { id: 'gradient-d', label: 'Diagonal' },
-    { id: 'stripes-v', label: 'Rayas V' },
-    { id: 'stripes-h', label: 'Franjas H' },
-    { id: 'band-chest', label: 'Banda Pecho' },
-    { id: 'chevron', label: 'Chevron' },
-    { id: 'split', label: 'Split Pro' },
-    { id: 'hex', label: 'Hex Tech' },
-    { id: 'camo', label: 'Geo Camo' },
-  ],
-  presets: [
+  adultSizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
+  kidsSizes: ['2 - 4', '6 - 8', '10 - 12', '14 - 16'],
+  productLines: [
     {
-      name: 'Studio Blanco',
-      bg: '#eceff4',
-      product: {
-        color: '#f5f5f2',
-        zones: { front: '#f5f5f2', back: '#f5f5f2', sleeveL: '#f5f5f2', sleeveR: '#f5f5f2', collar: '#f5f5f2' },
-        pattern: 'solid',
-        patternColor: '#18191c',
-        patternAlpha: 0.85,
-      },
+      id: 'basica',
+      label: 'Línea Básica',
+      shortLabel: 'Básica',
+      audiences: ['Hombre', 'Mujer', 'Niños'],
+      references: [
+        { id: 'piel-durazno', label: 'Piel de durazno', price: 14, audiences: ['Hombre', 'Mujer'], fit: 'regular' },
+        { id: 'algodon-175', label: 'Algodón 175 gr', price: 16, audiences: ['Hombre', 'Mujer'], fit: 'regular' },
+        { id: 'algodon-ninos', label: 'Algodón niños', price: 13, audiences: ['Niños'], fit: 'kids' },
+      ],
     },
     {
-      name: 'Pro Sport',
-      bg: '#e5ebf5',
-      product: {
-        color: '#132448',
-        zones: { front: '#132448', back: '#132448', sleeveL: '#0d1a36', sleeveR: '#0d1a36', collar: '#06b6d4' },
-        pattern: 'chevron',
-        patternColor: '#06b6d4',
-        patternAlpha: 0.9,
-      },
+      id: 'media',
+      label: 'Línea Media',
+      shortLabel: 'Media',
+      audiences: ['Hombre', 'Mujer'],
+      references: [
+        { id: 'tela-fria', label: 'Tela fría', price: 19, audiences: ['Hombre', 'Mujer'], fit: 'regular' },
+        { id: 'pesada-220', label: 'Tipo pesada 220 gr', price: 21, audiences: ['Hombre', 'Mujer'], fit: 'heavy' },
+        { id: 'blusa-dama', label: 'Blusa para dama', price: 19, audiences: ['Mujer'], fit: 'fitted' },
+      ],
     },
     {
-      name: 'Racing Red',
-      bg: '#1c1f26',
-      product: {
-        color: '#18191c',
-        zones: { front: '#18191c', back: '#18191c', sleeveL: '#c92432', sleeveR: '#c92432', collar: '#c92432' },
-        pattern: 'split',
-        patternColor: '#c92432',
-        patternAlpha: 0.95,
-      },
-    },
-    {
-      name: 'Cyber Hex',
-      bg: '#161822',
-      product: {
-        color: '#1b1630',
-        zones: { front: '#1b1630', back: '#1b1630', sleeveL: '#141024', sleeveR: '#141024', collar: '#a855f7' },
-        pattern: 'hex',
-        patternColor: '#a855f7',
-        patternAlpha: 0.65,
-      },
-    },
-    {
-      name: 'Club Clásico',
-      bg: '#edf0f5',
-      product: {
-        color: '#f5f5f2',
-        zones: { front: '#f5f5f2', back: '#f5f5f2', sleeveL: '#1f2f58', sleeveR: '#1f2f58', collar: '#1f2f58' },
-        pattern: 'band-chest',
-        patternColor: '#1f2f58',
-        patternAlpha: 1,
-      },
-    },
-    {
-      name: 'Street Arena',
-      bg: '#eceae4',
-      product: {
-        color: '#d8c6a0',
-        zones: { front: '#d8c6a0', back: '#d8c6a0', sleeveL: '#5a3b2b', sleeveR: '#5a3b2b', collar: '#18191c' },
-        pattern: 'camo',
-        patternColor: '#5a3b2b',
-        patternAlpha: 0.4,
-      },
+      id: 'premium',
+      label: 'Línea Premium',
+      shortLabel: 'Premium',
+      audiences: ['Hombre', 'Mujer'],
+      references: [
+        { id: 'pesada-265', label: 'Tipo pesada 265 gr', price: 26, audiences: ['Hombre', 'Mujer'], fit: 'heavy' },
+        { id: 'qatar-oversize', label: 'Qatar oversize', price: 28, audiences: ['Hombre', 'Mujer'], fit: 'oversize' },
+        { id: 'cuello-colores-normal', label: 'Cuello colores normal', price: 27, audiences: ['Hombre', 'Mujer'], fit: 'regular', customCollar: true },
+        { id: 'cuello-colores-crop', label: 'Cuello colores crop top', price: 25, audiences: ['Mujer'], fit: 'crop', customCollar: true },
+      ],
     },
   ],
   stageBgs: [
@@ -108,24 +55,23 @@ export const CONFIG = {
     { name: 'Azul Hielo', hex: '#e2ebf6' },
   ],
   colors: [
-    { name: 'Blanco', hex: '#f5f5f2' },
-    { name: 'Negro', hex: '#18191c' },
-    { name: 'Gris jaspe', hex: '#a3a8ae' },
-    { name: 'Grafito', hex: '#3a3e45' },
-    { name: 'Azul marino', hex: '#132448' },
-    { name: 'Azul rey', hex: '#2563c9' },
-    { name: 'Cyan', hex: '#06b6d4' },
-    { name: 'Verde bosque', hex: '#1b5e3f' },
-    { name: 'Lima neón', hex: '#84cc16' },
-    { name: 'Amarillo', hex: '#f3c53a' },
-    { name: 'Naranja', hex: '#ef7d22' },
-    { name: 'Rojo', hex: '#c92432' },
-    { name: 'Vino', hex: '#6d1d32' },
-    { name: 'Rosa', hex: '#f3a9c2' },
-    { name: 'Fucsia', hex: '#d3377a' },
-    { name: 'Morado', hex: '#6b45a8' },
-    { name: 'Arena', hex: '#d8c6a0' },
-    { name: 'Café', hex: '#5a3b2b' },
+    { name: 'Rosado', hex: '#ec6b9e' },
+    { name: 'Verde', hex: '#1f7a4c' },
+    { name: 'Rojo', hex: '#c81e2b' },
+    { name: 'Azul', hex: '#2563c9' },
+    { name: 'Blanco', hex: '#f7f7f5' },
+    { name: 'Negro', hex: '#17181b' },
+    { name: 'Gris', hex: '#8e949c' },
+    { name: 'Azul petróleo', hex: '#155e63' },
+    { name: 'Azul bebé', hex: '#a6d4f2' },
+    { name: 'Vino tinto', hex: '#661a2b' },
+    { name: 'Hueso', hex: '#ede8dc' },
+    { name: 'Amarillo', hex: '#f2c629' },
+    { name: 'Rosado piel', hex: '#eab8a5' },
+    { name: 'Azul oscuro', hex: '#162547' },
+    { name: 'Rosado bebé', hex: '#f7cad9' },
+    { name: 'Beige', hex: '#d6c29f' },
+    { name: 'Café', hex: '#5c3b28' },
   ],
   fonts: [
     { family: 'Anton', label: 'Anton' },
@@ -149,6 +95,19 @@ export const CONFIG = {
     { type: 'bolt', label: 'Rayo' },
   ],
 };
+
+export function getLine(lineId) {
+  return CONFIG.productLines.find((l) => l.id === lineId) || CONFIG.productLines[0];
+}
+
+export function getReference(lineId, refId) {
+  const line = getLine(lineId);
+  return line.references.find((r) => r.id === refId) || line.references[0];
+}
+
+export function getSizesForAudience(audience) {
+  return audience === 'Niños' ? CONFIG.kidsSizes : CONFIG.adultSizes;
+}
 
 export function money(v) {
   return new Intl.NumberFormat(CONFIG.locale, { style: 'currency', currency: CONFIG.currency }).format(v);
