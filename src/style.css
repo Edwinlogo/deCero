@@ -244,18 +244,29 @@ h2, h3 { margin: 0; }
 .price-lines li.total { font-weight: 800; border-bottom: 0; font-size: 17px; padding-top: 10px; }
 .price-lines li.disc { color: #059669; }
 
-/* Diseño (antes Añadir) */
+/* Diseño (selector desplegable + carga compacta + capas) */
+.select-field {
+  width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px;
+  background: #fff; font-weight: 600; font-size: 13.5px; color: var(--ink); cursor: pointer;
+  transition: border-color .15s, box-shadow .15s;
+}
+.select-field:hover { border-color: #93c5fd; }
+.select-field:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
 .dropzone {
-  display: grid; justify-items: center; gap: 4px; text-align: center; padding: 24px 12px; border: 2px dashed #cbd5e1; border-radius: var(--radius);
+  display: flex; align-items: center; gap: 11px; text-align: left; padding: 10px 12px;
+  border: 1.5px dashed #cbd5e1; border-radius: var(--radius);
   background: #f8fafc; cursor: pointer; transition: border-color .15s, background .15s;
 }
 .dropzone:hover { border-color: var(--accent); background: var(--accent-soft); }
-.dropzone small { color: var(--muted); font-size: 12px; }
+.dz-text { display: grid; gap: 2px; min-width: 0; }
+.dz-text b { font-size: 13.5px; line-height: 1.2; }
+.dz-text small { color: var(--muted); font-size: 11.5px; line-height: 1.25; }
 .dz-plus {
-  width: 44px; height: 44px; border-radius: 50%; background: var(--accent-soft); color: var(--accent);
-  display: grid; place-items: center; margin-bottom: 4px; transition: background .15s, color .15s, transform .15s;
+  width: 34px; height: 34px; flex: none; border-radius: 50%; background: var(--accent-soft); color: var(--accent);
+  display: grid; place-items: center; transition: background .15s, color .15s, transform .15s;
 }
-.dropzone:hover .dz-plus { background: var(--accent); color: #fff; transform: scale(1.06); }
+.dropzone:hover .dz-plus { background: var(--accent); color: #fff; transform: scale(1.05); }
 
 .price-actions { display: grid; gap: 8px; margin-top: 14px; }
 

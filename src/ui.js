@@ -132,19 +132,14 @@ export function initUI(viewer) {
     }));
   });
 
-  // Selector de Espacio (límite de tamaño para cada nueva imagen en pestaña Diseño)
-  const spaceGrid = $('#space-grid');
+  // Selector desplegable de Tamaño (límite de tamaño para cada nueva imagen en pestaña Diseño)
+  const spaceSelect = $('#space-select');
   CONFIG.printSpaces.forEach((sp) => {
-    spaceGrid.append(h('button', {
-      class: 'ref-btn',
-      'data-space': sp.id,
-      onclick: () => {
-        state.product.printSpace = sp.id;
-        emit('product');
-      },
-    },
-    h('b', { text: sp.label }),
-    h('small', { text: sp.desc })));
+    spaceSelect.append(h('option', { value: sp.id, text: `${sp.label} · ${sp.desc}` }));
+  });
+  spaceSelect.addEventListener('change', () => {
+    state.product.printSpace = spaceSelect.value;
+    emit('product');
   });
 
   const colorLabel = (hex) => CONFIG.colors.find((c) => c.hex.toLowerCase() === (hex || '').toLowerCase())?.name || hex;
@@ -209,8 +204,8 @@ export function initUI(viewer) {
       }));
     });
 
-    // Espacio de diseño seleccionado
-    $$('#space-grid .ref-btn').forEach((b) => b.classList.toggle('active', b.dataset.space === p.printSpace));
+    // Tamaño de diseño seleccionado
+    spaceSelect.value = p.printSpace;
 
     renderPrice();
   }
@@ -231,7 +226,7 @@ export function initUI(viewer) {
       ['Color', colorLabel(p.color)],
       ...(ref.customCollar ? [['Color del cuello', colorLabel(p.collarColor)]] : []),
       ['Talla', p.size],
-      ['Espacio', (() => { const sp = getPrintSpace(p.printSpace); return `${sp.label} (${sp.desc})`; })()],
+      ['Tamaño diseño', (() => { const sp = getPrintSpace(p.printSpace); return `${sp.label} (${sp.desc})`; })()],
       ['Estampado', info.sides.length === 2 ? 'Frente y espalda' : info.sides[0] === 'front' ? 'Frente' : info.sides[0] === 'back' ? 'Espalda' : 'Sin estampado'],
     ];
     rows.forEach(([k, v]) => sumBox.append(h('div', { class: 'summary-row' }, h('span', { text: k }), h('b', { text: v }))));
@@ -484,7 +479,7 @@ export function initUI(viewer) {
   on('layers', () => {
     renderLayers();
     renderProps();
-    if (state.selectedId && state.selectedId !== lastSel) showTab('edit');
+    if (state.selectedId && state.selectedId !== lastSel) showTab('add');
     lastSel = state.selectedId;
   });
   on('design', () => binders.forEach((f) => f()));

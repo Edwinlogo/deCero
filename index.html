@@ -109,7 +109,6 @@
           <nav class="tabs" id="tabs">
             <button class="tab active" data-tab="product">Prenda</button>
             <button class="tab" data-tab="add">Diseño</button>
-            <button class="tab" data-tab="edit">Capas</button>
             <button class="tab" data-tab="price">Precio</button>
           </nav>
 
@@ -141,19 +140,21 @@
 
             <!-- DISEÑO -->
             <section class="page" id="tab-add">
-              <h3>Espacio</h3>
-              <div class="ref-grid" id="space-grid"></div>
+              <h3>Tamaño</h3>
+              <select id="space-select" class="select-field" aria-label="Tamaño de impresión"></select>
 
               <h3>Imagen o Logo</h3>
               <label class="dropzone" id="dropzone">
                 <input type="file" id="file-input" accept="image/*" hidden />
                 <span class="dz-plus" aria-hidden="true">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
                     <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                   </svg>
                 </span>
-                <b>Subir imagen o logo</b>
-                <small>PNG transparente, SVG, JPG o WebP · arrastra o pega (Ctrl+V)</small>
+                <span class="dz-text">
+                  <b>Subir imagen o logo</b>
+                  <small>PNG, SVG, JPG o WebP · arrastra o pega</small>
+                </span>
               </label>
 
               <h3>Accesos rápidos</h3>
@@ -162,10 +163,7 @@
                 <button class="btn" id="btn-add-chest">🛡️ Escudo pecho</button>
                 <button class="btn" id="btn-add-dorsal">👕 Dorsal espalda</button>
               </div>
-            </section>
 
-            <!-- CAPAS -->
-            <section class="page" id="tab-edit">
               <div class="row between">
                 <h3 class="inline">Capas · <span id="side-label">Frente</span></h3>
                 <button class="btn tiny ghost" id="btn-clear-side">Vaciar lado</button>
