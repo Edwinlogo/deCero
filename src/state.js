@@ -22,18 +22,21 @@ export function defaultProduct() {
 }
 
 export function normalizeProduct(p) {
-  const line = getLine(p.line);
-  p.line = line.id;
-  if (!line.audiences.includes(p.audience)) {
-    p.audience = line.audiences[0];
+  const validAudiences = ['Hombre', 'Mujer', 'Niños'];
+  if (!validAudiences.includes(p.audience)) {
+    p.audience = 'Hombre';
   }
-  let ref = line.references.find((r) => r.id === p.reference);
-  if (!ref || !ref.audiences.includes(p.audience)) {
+  let line = getLine(p.line);
+  if (!line.audiences.includes(p.audience)) {
+    line = CONFIG.productLines.find((l) => l.audiences.includes(p.audience)) || CONFIG.productLines[0];
+    p.line = line.id;
+  } else {
+    p.line = line.id;
+  }
+  let ref = line.references.find((r) => r.id === p.reference && r.audiences.includes(p.audience));
+  if (!ref) {
     ref = line.references.find((r) => r.audiences.includes(p.audience)) || line.references[0];
     p.reference = ref.id;
-    if (!ref.audiences.includes(p.audience)) {
-      p.audience = ref.audiences[0];
-    }
   }
   const sizes = getSizesForAudience(p.audience);
   if (!sizes.includes(p.size)) {

@@ -11,40 +11,75 @@
   </head>
   <body>
     <div id="app">
-      <header class="topbar">
-        <div class="brand">
-          <div class="brand-mark">dC</div>
-          <span>deCero<b>3D</b></span>
-          <span class="brand-tag hide-sm">Studio</span>
-        </div>
-        <div class="top-actions">
-          <button class="icon-btn" id="btn-undo" title="Deshacer (Ctrl+Z)" disabled>↶</button>
-          <button class="icon-btn" id="btn-redo" title="Rehacer (Ctrl+Y)" disabled>↷</button>
-          <button class="btn ghost hide-sm" id="btn-designs">Mis diseños</button>
-          <button class="btn ghost hide-sm" id="btn-export">Exportar</button>
-          <button class="btn ghost" id="btn-install" hidden>Instalar app</button>
-          <button class="btn primary" id="btn-cart">🛒 Carrito <span class="badge" id="cart-count">0</span></button>
-        </div>
-      </header>
-
       <main class="workspace">
         <section class="stage" id="stage">
           <div id="viewport"></div>
-          <div class="stage-toolbar">
-            <button class="chip active" data-view="front">Frente</button>
-            <button class="chip" data-view="back">Espalda</button>
-            <button class="chip hide-xs" data-view="left">Izq</button>
-            <button class="chip hide-xs" data-view="right">Der</button>
-            <span class="chip-sep"></span>
-            <button class="chip icon-chip" id="btn-rotate" title="Girar 360°" aria-label="Girar 360°">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6,4 20,12 6,20"/></svg>
-            </button>
-            <button class="chip active" id="btn-guides" title="Mostrar guías de edición">Guías</button>
-            <div class="bg-dots" id="bg-dots" title="Ambiente de estudio"></div>
-            <label class="chip bg-chip" title="Color de fondo libre">
-              <input type="color" id="bg-color" value="#eceff4" />
-            </label>
+
+          <!-- Flotante Izquierda: marca + controles de vista/visor -->
+          <div class="float-rail left">
+            <div class="brand-pill" title="deCero 3D Studio">
+              <div class="brand-mark">dC</div>
+              <span class="hide-xs">deCero<b>3D</b></span>
+            </div>
+
+            <div class="float-group">
+              <button class="fbtn active" data-view="front" title="Vista frente">Frente</button>
+              <button class="fbtn" data-view="back" title="Vista espalda">Espalda</button>
+              <button class="fbtn" data-view="left" title="Vista izquierda">Izq</button>
+              <button class="fbtn" data-view="right" title="Vista derecha">Der</button>
+            </div>
+
+            <div class="float-group">
+              <button class="fbtn icon-only" id="btn-rotate" title="Girar 360°" aria-label="Girar 360°">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6,4 20,12 6,20"/></svg>
+              </button>
+              <button class="fbtn active" id="btn-guides" title="Mostrar u ocultar guías de edición">Guías</button>
+              <div class="bg-menu-wrap">
+                <button class="fbtn" id="btn-bg-toggle" title="Cambiar color de fondo" aria-expanded="false">Fondo</button>
+                <div class="bg-popover" id="bg-popover" hidden>
+                  <div class="bg-popover-title">Color de fondo</div>
+                  <div class="bg-dots" id="bg-dots"></div>
+                  <label class="bg-custom-row">
+                    <span>Personalizado</span>
+                    <input type="color" id="bg-color" value="#eceff4" />
+                  </label>
+                </div>
+              </div>
+            </div>
           </div>
+
+          <!-- Flotante Derecha: maximizar + carrito + herramientas -->
+          <div class="float-rail right">
+            <div class="float-group">
+              <button class="fbtn icon-only" id="btn-maximize" title="Maximizar visor 3D" aria-label="Maximizar visor 3D">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/>
+                  <line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
+                </svg>
+              </button>
+              <button class="fbtn primary-pill" id="btn-cart" title="Ver carrito" aria-label="Carrito">
+                <span>🛒</span>
+                <span class="badge" id="cart-count">0</span>
+              </button>
+            </div>
+
+            <div class="float-group">
+              <button class="fbtn icon-only" id="btn-undo" title="Deshacer (Ctrl+Z)" aria-label="Deshacer" disabled>↶</button>
+              <button class="fbtn icon-only" id="btn-redo" title="Rehacer (Ctrl+Y)" aria-label="Rehacer" disabled>↷</button>
+              <button class="fbtn icon-only" id="btn-designs" title="Mis diseños" aria-label="Mis diseños">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+                </svg>
+              </button>
+              <button class="fbtn icon-only" id="btn-export" title="Exportar" aria-label="Exportar">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+              </button>
+              <button class="fbtn icon-only" id="btn-install" title="Instalar app" aria-label="Instalar app" hidden>📲</button>
+            </div>
+          </div>
+
           <div class="stage-hint" id="stage-hint">Arrastra para girar 360° · Zoom con rueda o pellizco · Toca un diseño sobre la camisa para moverlo</div>
           <div class="drop-overlay" id="drop-overlay">Suelta tu imagen aquí</div>
           <div class="loading" id="loading"><div class="spinner"></div>Cargando modelo 3D…</div>
@@ -54,18 +89,19 @@
         <aside class="panel">
           <nav class="tabs" id="tabs">
             <button class="tab active" data-tab="product">Prenda</button>
-            <button class="tab" data-tab="add">Añadir</button>
+            <button class="tab" data-tab="add">Diseño</button>
             <button class="tab" data-tab="edit">Capas</button>
+            <button class="tab" data-tab="price">Precio</button>
           </nav>
 
           <div class="tab-pages">
             <!-- PRENDA -->
             <section class="page active" id="tab-product">
-              <h3>Línea de producto</h3>
-              <div class="seg" id="seg-line"></div>
-
               <h3>Público</h3>
               <div class="seg" id="seg-audience"></div>
+
+              <h3>Línea de producto</h3>
+              <div class="seg" id="seg-line"></div>
 
               <h3>Referencia</h3>
               <div class="ref-grid" id="ref-grid"></div>
@@ -82,13 +118,9 @@
 
               <h3>Talla</h3>
               <div class="sizes" id="sizes"></div>
-
-              <h3>Resumen de precio</h3>
-              <ul class="price-lines" id="price-lines"></ul>
-              <p class="muted small">Impresión DTF / Sublimación HD. Pedidos desde {{min}} unidades tienen descuento automático.</p>
             </section>
 
-            <!-- AÑADIR -->
+            <!-- DISEÑO -->
             <section class="page" id="tab-add">
               <h3>Imagen o Logo</h3>
               <label class="dropzone" id="dropzone">
@@ -104,15 +136,9 @@
                 <button class="btn" id="btn-add-chest">🛡️ Escudo pecho</button>
                 <button class="btn" id="btn-add-dorsal">👕 Dorsal espalda</button>
               </div>
-
-              <h3>Formas</h3>
-              <div class="grid shapes" id="shape-grid"></div>
-
-              <h3>Stickers</h3>
-              <div class="grid stickers" id="sticker-grid"></div>
             </section>
 
-            <!-- EDITAR CAPAS -->
+            <!-- CAPAS -->
             <section class="page" id="tab-edit">
               <div class="row between">
                 <h3 class="inline">Capas · <span id="side-label">Frente</span></h3>
@@ -121,19 +147,35 @@
               <ul class="layers" id="layers"></ul>
               <div id="props"></div>
             </section>
+
+            <!-- PRECIO / LIQUIDACIÓN -->
+            <section class="page" id="tab-price">
+              <h3>Prenda seleccionada</h3>
+              <div class="summary-card" id="product-summary"></div>
+
+              <h3>Cantidad</h3>
+              <div class="qty-row">
+                <div class="qty qty-lg">
+                  <button id="qty-minus" aria-label="Menos">−</button>
+                  <span id="qty-val">1</span>
+                  <button id="qty-plus" aria-label="Más">＋</button>
+                </div>
+                <span class="muted small" id="qty-unit-hint"></span>
+              </div>
+
+              <h3>Resumen de precio</h3>
+              <ul class="price-lines" id="price-lines"></ul>
+
+              <button class="btn primary big wide" id="btn-add-cart" style="margin-top: 14px">Añadir al carrito</button>
+            </section>
           </div>
 
-          <footer class="buybar">
+          <footer class="buybar" id="buybar">
             <div class="buy-info">
               <div class="buy-total" id="buy-total">—</div>
               <div class="buy-sub" id="buy-sub"></div>
             </div>
-            <div class="qty">
-              <button id="qty-minus" aria-label="Menos">−</button>
-              <span id="qty-val">1</span>
-              <button id="qty-plus" aria-label="Más">＋</button>
-            </div>
-            <button class="btn primary big" id="btn-add-cart">Añadir</button>
+            <button class="btn primary" id="btn-go-price">Liquidar →</button>
           </footer>
         </aside>
       </main>

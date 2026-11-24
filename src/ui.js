@@ -1,4 +1,4 @@
-// Interfaz de usuario: líneas de producto, referencias, colores, capas, propiedades, carrito, pedidos y exportación.
+// Interfaz de usuario: flotantes laterales, maximizar 3D, prenda por línea, diseño, capas y liquidación de precio.
 import { CONFIG, getLine, getReference, getSizesForAudience, money } from './config.js';
 import {
   state, defaultProduct, normalizeProduct, on, emit, images, selected, addElement, removeElement, selectElement, duplicateElement, moveLayer, clearSide,
@@ -52,31 +52,54 @@ function download(canvasOrBlob, name) {
   else canvasOrBlob.toBlob((b) => b && go(b), 'image/png');
 }
 
-const SHAPE_ICONS = {
-  rect: '<rect x="3" y="5" width="18" height="14" rx="2"/>',
-  circle: '<circle cx="12" cy="12" r="9"/>',
-  triangle: '<path d="M12 3 22 21H2z"/>',
-  star: '<path d="m12 2 3 7 7.5.6-5.7 5 1.8 7.4L12 18l-6.6 4 1.8-7.4-5.7-5L9 9z"/>',
-  heart: '<path d="M12 21C5 15 2 11.5 2 8a5 5 0 0 1 10-1 5 5 0 0 1 10 1c0 3.500-3 7-10 13z"/>',
-  bolt: '<path d="M13 2 4 14h7l-1 8 10-13h-7z"/>',
-};
-const shapeSvg = (t) => `<svg viewBox="0 0 24 24">${SHAPE_ICONS[t]}</svg>`;
 const SHAPE_GLYPH = { rect: '▭', circle: '●', triangle: '▲', star: '★', heart: '♥', bolt: '⚡' };
-
-const PLAY_SVG = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6,4 20,12 6,20"/></svg>';
-const PAUSE_SVG = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>';
+const PLAY_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6,4 20,12 6,20"/></svg>';
+const PAUSE_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>';
+const MAX_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
+const MIN_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
 
 export function initUI(viewer) {
+  const app = $('#app');
   const stage = $('#stage');
 
   // ---------------- Pestañas ----------------
+  let currentTab = 'product';
   function showTab(name) {
+    currentTab = name;
     $$('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === name));
     $$('.page').forEach((p) => p.classList.toggle('active', p.id === 'tab-' + name));
+    $('#buybar').hidden = name === 'price';
   }
   $$('.tab').forEach((t) => t.addEventListener('click', () => showTab(t.dataset.tab)));
+  $('#btn-go-price').onclick = () => showTab('price');
 
-  // ---------------- Línea de producto, Público, Referencia y Colores ----------------
+  // ---------------- Maximizar visor 3D ----------------
+  const btnMax = $('#btn-maximize');
+  function setMaximized(val) {
+    app.classList.toggle('maximized', val);
+    btnMax.classList.toggle('active', val);
+    btnMax.innerHTML = val ? MIN_SVG : MAX_SVG;
+    btnMax.title = val ? 'Mostrar panel de edición' : 'Maximizar visor 3D';
+    btnMax.setAttribute('aria-label', btnMax.title);
+    requestAnimationFrame(() => viewer.resize());
+  }
+  btnMax.onclick = () => setMaximized(!app.classList.contains('maximized'));
+
+  // ---------------- Público, Línea de producto, Referencia y Colores ----------------
+  const AUDIENCES = ['Hombre', 'Mujer', 'Niños'];
+  const segAud = $('#seg-audience');
+  AUDIENCES.forEach((aud) => {
+    segAud.append(h('button', {
+      'data-aud': aud,
+      text: aud,
+      onclick: () => {
+        state.product.audience = aud;
+        normalizeProduct(state.product);
+        emit('product');
+      },
+    }));
+  });
+
   const segLine = $('#seg-line');
   CONFIG.productLines.forEach((line) => {
     segLine.append(h('button', {
@@ -107,56 +130,46 @@ export function initUI(viewer) {
     }));
   });
 
-  $('#tab-product .muted.small').textContent = $('#tab-product .muted.small').textContent.replace('{{min}}', CONFIG.prices.bulkMinQty);
+  const colorLabel = (hex) => CONFIG.colors.find((c) => c.hex.toLowerCase() === (hex || '').toLowerCase())?.name || hex;
 
   function renderProduct() {
     const p = normalizeProduct(state.product);
     const line = getLine(p.line);
     const ref = getReference(p.line, p.reference);
 
-    // Línea de producto
-    $$('#seg-line button').forEach((b) => b.classList.toggle('active', b.dataset.line === line.id));
+    // Público (arriba de Línea de producto)
+    $$('#seg-audience button').forEach((b) => b.classList.toggle('active', b.dataset.aud === p.audience));
 
-    // Público disponible para esta línea
-    const segAud = $('#seg-audience');
-    segAud.innerHTML = '';
-    line.audiences.forEach((aud) => {
-      segAud.append(h('button', {
-        class: aud === p.audience ? 'active' : '',
-        text: aud,
-        onclick: () => {
-          state.product.audience = aud;
-          normalizeProduct(state.product);
-          emit('product');
-        },
-      }));
+    // Línea de producto (Media y Premium deshabilitadas para Niños)
+    $$('#seg-line button').forEach((b) => {
+      const l = getLine(b.dataset.line);
+      const allowed = l.audiences.includes(p.audience);
+      b.disabled = !allowed;
+      b.title = allowed ? l.label : `${l.label} (no aplica para niños)`;
+      b.classList.toggle('active', b.dataset.line === line.id);
     });
 
-    // Referencias de esta línea
+    // Referencias aplicables a la línea y público seleccionados
     const refGrid = $('#ref-grid');
     refGrid.innerHTML = '';
-    line.references.forEach((r) => {
-      const audNote = r.audiences.length === 1 ? r.audiences[0] : r.audiences.join(' / ');
+    const refs = line.references.filter((r) => r.audiences.includes(p.audience));
+    refs.forEach((r) => {
       refGrid.append(h('button', {
         class: 'ref-btn' + (r.id === ref.id ? ' active' : ''),
         onclick: () => {
           state.product.reference = r.id;
-          if (!r.audiences.includes(state.product.audience)) {
-            state.product.audience = r.audiences[0];
-          }
           normalizeProduct(state.product);
           emit('product');
         },
       },
       h('b', { text: r.label }),
-      h('small', { text: `${audNote} · ${money(r.price)}` })));
+      h('small', { text: money(r.price) })));
     });
 
     // Color principal (solo las 17 opciones)
     const activeHex = p.color.toLowerCase();
     $$('#swatches .swatch[data-hex]').forEach((b) => b.classList.toggle('active', b.dataset.hex.toLowerCase() === activeHex));
-    const known = CONFIG.colors.find((c) => c.hex.toLowerCase() === activeHex);
-    $('#color-name').textContent = known ? known.name : p.color;
+    $('#color-name').textContent = colorLabel(p.color);
 
     // Color del cuello (solo en referencias Cuello colores normal / crop top)
     const collarBlock = $('#collar-color-block');
@@ -164,8 +177,7 @@ export function initUI(viewer) {
     if (ref.customCollar) {
       const cHex = (p.collarColor || p.color).toLowerCase();
       $$('#collar-swatches .swatch[data-chex]').forEach((b) => b.classList.toggle('active', b.dataset.chex.toLowerCase() === cHex));
-      const cKnown = CONFIG.colors.find((c) => c.hex.toLowerCase() === cHex);
-      $('#collar-color-name').textContent = cKnown ? cKnown.name : p.collarColor;
+      $('#collar-color-name').textContent = colorLabel(p.collarColor);
     }
 
     // Tallas (niños vs adulto)
@@ -184,26 +196,43 @@ export function initUI(viewer) {
   }
 
   function renderPrice() {
+    const p = state.product;
+    const line = getLine(p.line);
+    const ref = getReference(p.line, p.reference);
     const info = priceInfo();
+
+    // Resumen de prenda en pestaña Precio
+    const sumBox = $('#product-summary');
+    sumBox.innerHTML = '';
+    const rows = [
+      ['Público', p.audience],
+      ['Línea', line.label],
+      ['Referencia', ref.label],
+      ['Color', colorLabel(p.color)],
+      ...(ref.customCollar ? [['Color del cuello', colorLabel(p.collarColor)]] : []),
+      ['Talla', p.size],
+      ['Estampado', info.sides.length === 2 ? 'Frente y espalda' : info.sides[0] === 'front' ? 'Frente' : info.sides[0] === 'back' ? 'Espalda' : 'Sin estampado'],
+    ];
+    rows.forEach(([k, v]) => sumBox.append(h('div', { class: 'summary-row' }, h('span', { text: k }), h('b', { text: v }))));
+
     const ul = $('#price-lines');
     ul.innerHTML = '';
     info.lines.forEach((l) => ul.append(h('li', {}, h('span', { text: l.label }), h('span', { text: money(l.amount) }))));
     if (info.qty > 1) ul.append(h('li', {}, h('span', { text: `Cantidad × ${info.qty}` }), h('span', { text: money(info.subtotal) })));
     if (info.discount) ul.append(h('li', { class: 'disc' }, h('span', { text: `Descuento por volumen (${Math.round(info.discount * 100)}%)` }), h('span', { text: '−' + money(info.subtotal * info.discount) })));
-    ul.append(h('li', { class: 'total' }, h('span', { text: 'Total' }), h('span', { text: money(info.total) })));
+    ul.append(h('li', { class: 'total' }, h('span', { text: 'Total a pagar' }), h('span', { text: money(info.total) })));
+
     $('#buy-total').textContent = money(info.total);
-    $('#buy-sub').textContent = `${info.qty} × ${money(info.unit)} · ${state.product.audience} · talla ${state.product.size}`;
+    $('#buy-sub').textContent = `${info.qty} × ${money(info.unit)} · ${p.audience} · talla ${p.size}`;
     $('#qty-val').textContent = info.qty;
+    $('#qty-unit-hint').textContent = `${money(info.unit)} c/u`;
   }
   $('#qty-minus').onclick = () => { state.product.qty = Math.max(1, state.product.qty - 1); renderPrice(); };
   $('#qty-plus').onclick = () => { state.product.qty = Math.min(99, state.product.qty + 1); renderPrice(); };
   on('product', renderProduct);
   on('layers', renderPrice);
 
-  // ---------------- Añadir ----------------
-  $('#shape-grid').append(...CONFIG.shapes.map((s) => h('button', { title: s.label, html: shapeSvg(s.type) + `<span>${s.label}</span>`, onclick: () => addShape(s.type) })));
-  $('#sticker-grid').append(...CONFIG.stickers.map((c) => h('button', { text: c, onclick: () => addElement({ type: 'emoji', char: c }) })));
-
+  // ---------------- Diseño (antes Añadir) ----------------
   $('#btn-add-text').onclick = () => {
     addElement({
       type: 'text', text: 'TU TEXTO', font: 'Anton', color: contrastInk(state.product.color), strokeColor: '#000000',
@@ -233,11 +262,6 @@ export function initUI(viewer) {
     }, 'back');
     toast('Nombre y dorsal añadidos en la espalda');
   };
-
-  function addShape(type) {
-    const dark = lum(state.product.color) < 0.5;
-    addElement({ type: 'shape', shape: type, fill: dark ? '#f2c629' : '#c81e2b', stroke: '#000000', strokeW: 0, ratio: 1, radius: 0.15 });
-  }
 
   async function processFile(file) {
     if (!file || !file.type.startsWith('image/')) return toast('Ese archivo no es una imagen');
@@ -295,14 +319,14 @@ export function initUI(viewer) {
   const layerLabel = (el) => {
     if (el.type === 'text') return (el.text || '').split('\n')[0] || 'Texto';
     if (el.type === 'image') return el.name || 'Imagen';
-    if (el.type === 'shape') return CONFIG.shapes.find((s) => s.type === el.shape)?.label || 'Forma';
-    return 'Sticker';
+    if (el.type === 'shape') return CONFIG.shapes.find((s) => s.type === el.shape)?.label || 'Escudo';
+    return 'Elemento';
   };
   const layerThumb = (el) => {
     if (el.type === 'image') return h('img', { src: images.get(el.imgId)?.src || '', alt: '' });
     if (el.type === 'text') return h('span', { text: 'T', style: `font-family:"${el.font}";font-weight:700` });
     if (el.type === 'emoji') return h('span', { text: el.char });
-    return h('span', { text: SHAPE_GLYPH[el.shape], style: `color:${el.fill}` });
+    return h('span', { text: SHAPE_GLYPH[el.shape] || '★', style: `color:${el.fill}` });
   };
 
   function renderLayers() {
@@ -409,13 +433,10 @@ export function initUI(viewer) {
     }
 
     if (el.type === 'shape') {
-      card.append(miniSeg(el, 'shape', 'Forma', CONFIG.shapes.map((s) => [s.type, SHAPE_GLYPH[s.type]])));
       card.append(colorField(el, 'fill', 'Relleno'));
       card.append(miniSeg(el, 'noFill', 'Relleno activo', [['false', 'Con relleno'], ['true', 'Sólo contorno']], () => { el.noFill = el.noFill === 'true' || el.noFill === true; if (el.noFill && !(el.strokeW > 0)) el.strokeW = 6; }));
       card.append(colorField(el, 'stroke', 'Color del contorno'));
       card.append(range(el, 'strokeW', 'Grosor del contorno', 0, 14, 0.5));
-      if (['rect', 'circle'].includes(el.shape)) card.append(range(el, 'ratio', 'Proporción alto/ancho', 0.2, 2, 0.01));
-      if (el.shape === 'rect') card.append(range(el, 'radius', 'Esquinas redondeadas', 0, 1, 0.01, (v) => Math.round(v * 100) + '%'));
     }
 
     card.append(range(el, 's', 'Tamaño', 0.1, 4.5, 0.01, (v) => Math.round(v * 100) + '%'));
@@ -444,7 +465,22 @@ export function initUI(viewer) {
   on('side', renderLayers);
   $('#btn-clear-side').onclick = () => clearSide(state.side);
 
-  // ---------------- Barra del visor y fondos ----------------
+  // ---------------- Controles flotantes y Menú de Fondo ----------------
+  const bgPopover = $('#bg-popover');
+  const btnBgToggle = $('#btn-bg-toggle');
+
+  function setBgOpen(open) {
+    bgPopover.hidden = !open;
+    btnBgToggle.classList.toggle('active', open);
+    btnBgToggle.setAttribute('aria-expanded', String(open));
+  }
+  btnBgToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setBgOpen(bgPopover.hidden);
+  });
+  bgPopover.addEventListener('click', (e) => e.stopPropagation());
+  document.addEventListener('click', () => { if (!bgPopover.hidden) setBgOpen(false); });
+
   function setStageBg(hex) {
     state.bg = hex;
     stage.style.setProperty('--stage-bg', hex);
@@ -462,6 +498,8 @@ export function initUI(viewer) {
       onclick: () => setStageBg(b.hex),
     }));
   });
+  $('#bg-color').oninput = (e) => setStageBg(e.target.value);
+  setStageBg(state.bg);
 
   $$('[data-view]').forEach((b) => b.addEventListener('click', () => {
     viewer.setView(b.dataset.view);
@@ -484,11 +522,9 @@ export function initUI(viewer) {
     e.currentTarget.classList.toggle('active', state.guides);
     emit('design');
   };
-  $('#bg-color').oninput = (e) => setStageBg(e.target.value);
-  setStageBg(state.bg);
   setTimeout(() => $('#stage-hint').classList.add('fade'), 9000);
 
-  // ---------------- Historial ----------------
+  // ---------------- Historial y Atajos ----------------
   const syncHistory = () => { $('#btn-undo').disabled = !canUndo(); $('#btn-redo').disabled = !canRedo(); };
   on('history', syncHistory);
   $('#btn-undo').onclick = undo;
@@ -503,8 +539,11 @@ export function initUI(viewer) {
     else if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
     else if (mod && e.key.toLowerCase() === 'd' && el) { e.preventDefault(); duplicateElement(el.id); }
     else if ((e.key === 'Delete' || e.key === 'Backspace') && el) { e.preventDefault(); removeElement(el.id); }
-    else if (e.key === 'Escape' && el) selectElement(null);
-    else if (el && e.key.startsWith('Arrow')) {
+    else if (e.key === 'Escape') {
+      if (!bgPopover.hidden) setBgOpen(false);
+      else if (el) selectElement(null);
+      else if (app.classList.contains('maximized')) setMaximized(false);
+    } else if (el && e.key.startsWith('Arrow')) {
       e.preventDefault();
       begin('nudge' + el.id);
       const d = e.shiftKey ? 0.05 : 0.01;
@@ -527,7 +566,6 @@ export function initUI(viewer) {
   const dlgCart = $('#dlg-cart');
   const saveCart = () => kvSet('cart', cart);
   const cartTotal = () => cart.reduce((a, i) => a + i.total, 0);
-  const colorLabel = (hex) => CONFIG.colors.find((c) => c.hex.toLowerCase() === (hex || '').toLowerCase())?.name || hex;
   const describe = (p) => {
     const line = getLine(p.line);
     const ref = getReference(p.line, p.reference);
@@ -717,5 +755,6 @@ export function initUI(viewer) {
   renderLayers();
   renderProps();
   syncHistory();
+  showTab(currentTab);
   return { showTab };
 }
