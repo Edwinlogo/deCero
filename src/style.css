@@ -118,15 +118,22 @@ h2, h3 { margin: 0; }
 .fbtn.primary-pill { background: var(--accent); color: #fff; padding: 7px 10px; min-width: 38px; }
 .fbtn.primary-pill:hover { background: var(--accent-hover); color: #fff; }
 
-/* Menú desplegable de Fondo */
-.bg-menu-wrap { position: relative; }
-.bg-popover {
-  position: absolute; left: calc(100% + 10px); top: 50%; transform: translateY(-50%);
+/* Menús desplegables flotantes (Vistas y Fondo) */
+.pop-menu-wrap { position: relative; }
+.side-popover {
+  position: absolute; left: calc(100% + 10px); top: 0;
   background: rgba(255,255,255,.96); backdrop-filter: blur(14px); border: 1px solid var(--line);
-  border-radius: 14px; padding: 12px; box-shadow: var(--shadow); min-width: 176px;
-  display: grid; gap: 10px; z-index: 20;
+  border-radius: 14px; padding: 11px; box-shadow: var(--shadow); min-width: 184px;
+  display: grid; gap: 9px; z-index: 20;
 }
-.bg-popover-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.popover-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.view-menu-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; }
+.view-menu-grid .fbtn { border: 1px solid var(--line); background: #fff; }
+.view-menu-grid .fbtn.active { border-color: #0f172a; background: #0f172a; color: #fff; }
+.fbtn.play-row {
+  width: 100%; border: 1px solid var(--line); background: #f8fafc; padding: 8px 10px;
+}
+.fbtn.play-row.active { border-color: #0f172a; background: #0f172a; color: #fff; }
 .bg-dots { display: flex; align-items: center; gap: 8px; }
 .bg-dot {
   width: 26px; height: 26px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(15,23,42,.22); padding: 0;

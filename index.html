@@ -35,21 +35,29 @@
           <!-- Flotante Izquierda: controles de vista/visor -->
           <div class="float-rail left">
             <div class="float-group">
-              <button class="fbtn active" data-view="front" title="Vista frente">Frente</button>
-              <button class="fbtn" data-view="back" title="Vista espalda">Espalda</button>
-              <button class="fbtn" data-view="left" title="Vista izquierda">Izq</button>
-              <button class="fbtn" data-view="right" title="Vista derecha">Der</button>
-            </div>
+              <div class="pop-menu-wrap">
+                <button class="fbtn" id="btn-view-toggle" title="Vistas y rotación" aria-expanded="false">Vistas</button>
+                <div class="side-popover" id="view-popover" hidden>
+                  <div class="popover-title">Vistas</div>
+                  <div class="view-menu-grid">
+                    <button class="fbtn active" data-view="front">Frente</button>
+                    <button class="fbtn" data-view="back">Espalda</button>
+                    <button class="fbtn" data-view="left">Izquierda</button>
+                    <button class="fbtn" data-view="right">Derecha</button>
+                  </div>
+                  <button class="fbtn play-row" id="btn-rotate" title="Girar 360°" aria-label="Girar 360°">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6,4 20,12 6,20"/></svg>
+                    <span>Girar</span>
+                  </button>
+                </div>
+              </div>
 
-            <div class="float-group">
-              <button class="fbtn icon-only" id="btn-rotate" title="Girar 360°" aria-label="Girar 360°">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6,4 20,12 6,20"/></svg>
-              </button>
               <button class="fbtn active" id="btn-guides" title="Mostrar u ocultar guías de edición">Guías</button>
-              <div class="bg-menu-wrap">
+
+              <div class="pop-menu-wrap">
                 <button class="fbtn" id="btn-bg-toggle" title="Cambiar color de fondo" aria-expanded="false">Fondo</button>
-                <div class="bg-popover" id="bg-popover" hidden>
-                  <div class="bg-popover-title">Color de fondo</div>
+                <div class="side-popover" id="bg-popover" hidden>
+                  <div class="popover-title">Color de fondo</div>
                   <div class="bg-dots" id="bg-dots"></div>
                   <label class="bg-custom-row">
                     <span>Personalizado</span>

@@ -465,21 +465,41 @@ export function initUI(viewer) {
   on('side', renderLayers);
   $('#btn-clear-side').onclick = () => clearSide(state.side);
 
-  // ---------------- Controles flotantes y Menú de Fondo ----------------
+  // ---------------- Controles flotantes: Menús de Vistas y Fondo ----------------
+  const viewPopover = $('#view-popover');
+  const btnViewToggle = $('#btn-view-toggle');
   const bgPopover = $('#bg-popover');
   const btnBgToggle = $('#btn-bg-toggle');
 
+  function setViewMenuOpen(open) {
+    viewPopover.hidden = !open;
+    btnViewToggle.classList.toggle('active', open);
+    btnViewToggle.setAttribute('aria-expanded', String(open));
+    if (open && !bgPopover.hidden) setBgOpen(false);
+  }
   function setBgOpen(open) {
     bgPopover.hidden = !open;
     btnBgToggle.classList.toggle('active', open);
     btnBgToggle.setAttribute('aria-expanded', String(open));
+    if (open && !viewPopover.hidden) setViewMenuOpen(false);
   }
+
+  btnViewToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setViewMenuOpen(viewPopover.hidden);
+  });
+  viewPopover.addEventListener('click', (e) => e.stopPropagation());
+
   btnBgToggle.addEventListener('click', (e) => {
     e.stopPropagation();
     setBgOpen(bgPopover.hidden);
   });
   bgPopover.addEventListener('click', (e) => e.stopPropagation());
-  document.addEventListener('click', () => { if (!bgPopover.hidden) setBgOpen(false); });
+
+  document.addEventListener('click', () => {
+    if (!viewPopover.hidden) setViewMenuOpen(false);
+    if (!bgPopover.hidden) setBgOpen(false);
+  });
 
   function setStageBg(hex) {
     state.bg = hex;
@@ -515,7 +535,7 @@ export function initUI(viewer) {
     const next = !viewer.autoRotate;
     viewer.setAutoRotate(next);
     e.currentTarget.classList.toggle('active', next);
-    e.currentTarget.innerHTML = next ? PAUSE_SVG : PLAY_SVG;
+    e.currentTarget.innerHTML = `${next ? PAUSE_SVG : PLAY_SVG}<span>${next ? 'Pausar' : 'Girar'}</span>`;
   };
   $('#btn-guides').onclick = (e) => {
     state.guides = !state.guides;
@@ -540,7 +560,8 @@ export function initUI(viewer) {
     else if (mod && e.key.toLowerCase() === 'd' && el) { e.preventDefault(); duplicateElement(el.id); }
     else if ((e.key === 'Delete' || e.key === 'Backspace') && el) { e.preventDefault(); removeElement(el.id); }
     else if (e.key === 'Escape') {
-      if (!bgPopover.hidden) setBgOpen(false);
+      if (!viewPopover.hidden) setViewMenuOpen(false);
+      else if (!bgPopover.hidden) setBgOpen(false);
       else if (el) selectElement(null);
       else if (app.classList.contains('maximized')) setMaximized(false);
     } else if (el && e.key.startsWith('Arrow')) {
