@@ -57,6 +57,8 @@ const PLAY_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentC
 const PAUSE_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>';
 const MAX_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
 const MIN_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
+const PENCIL_SVG = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>';
+const LOCK_SVG = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
 
 export function initUI(viewer) {
   const app = $('#app');
@@ -130,7 +132,7 @@ export function initUI(viewer) {
     }));
   });
 
-  // Selector de Espacio (límite de tamaño en pestaña Diseño)
+  // Selector de Espacio (límite de tamaño para cada nueva imagen en pestaña Diseño)
   const spaceGrid = $('#space-grid');
   CONFIG.printSpaces.forEach((sp) => {
     spaceGrid.append(h('button', {
@@ -138,17 +140,7 @@ export function initUI(viewer) {
       'data-space': sp.id,
       onclick: () => {
         state.product.printSpace = sp.id;
-        // Ajustar elementos existentes que superen el nuevo límite
-        if (!sp.unlimited) {
-          for (const side of ['front', 'back']) {
-            for (const el of state.elements[side]) {
-              const maxS = maxScaleForElement(el, sp.id);
-              if (el.s > maxS) el.s = maxS;
-            }
-          }
-        }
         emit('product');
-        changed(true);
       },
     },
     h('b', { text: sp.label }),
@@ -311,8 +303,9 @@ export function initUI(viewer) {
       const src = file.type === 'image/jpeg' ? c.toDataURL('image/jpeg', 0.92) : c.toDataURL('image/png');
       const id = newId('img');
       await registerImage(id, src);
-      const imgEl = { type: 'image', imgId: id, name: file.name.replace(/\.[^.]+$/, '').slice(0, 24), y: -0.25, s: 1.1 };
-      const maxS = maxScaleForElement(imgEl, state.product.printSpace);
+      const spId = state.product.printSpace;
+      const imgEl = { type: 'image', imgId: id, name: file.name.replace(/\.[^.]+$/, '').slice(0, 24), space: spId, y: -0.25, s: 1.1 };
+      const maxS = maxScaleForElement(imgEl, spId);
       imgEl.s = Math.min(imgEl.s, maxS * 0.92);
       addElement(imgEl);
     } catch {
@@ -471,7 +464,7 @@ export function initUI(viewer) {
       card.append(range(el, 'strokeW', 'Grosor del contorno', 0, 14, 0.5));
     }
 
-    const maxS = +Math.min(8, maxScaleForElement(el, state.product.printSpace)).toFixed(2);
+    const maxS = +Math.min(8, maxScaleForElement(el, el.space || state.product.printSpace)).toFixed(2);
     card.append(range(el, 's', 'Tamaño', 0.1, Math.max(0.2, maxS), 0.01, (v) => Math.round(v * 100) + '%'));
     card.append(range(el, 'rot', 'Rotación', -180, 180, 1, (v) => v + '°'));
     card.append(range(el, 'opacity', 'Opacidad', 0.1, 1, 0.01, (v) => Math.round(v * 100) + '%'));
@@ -572,7 +565,11 @@ export function initUI(viewer) {
   };
   $('#btn-guides').onclick = (e) => {
     state.guides = !state.guides;
-    e.currentTarget.classList.toggle('active', state.guides);
+    const btn = e.currentTarget;
+    btn.classList.toggle('active', state.guides);
+    btn.innerHTML = state.guides ? PENCIL_SVG : LOCK_SVG;
+    btn.title = state.guides ? 'Edición activa (pulsar para bloquear)' : 'Diseño bloqueado (pulsar para editar)';
+    btn.setAttribute('aria-label', state.guides ? 'Edición activa' : 'Diseño bloqueado');
     emit('design');
   };
   setTimeout(() => $('#stage-hint').classList.add('fade'), 9000);

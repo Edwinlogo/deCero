@@ -344,30 +344,27 @@ function drawGuides(ctx, el, cx, cy) {
   ctx.restore();
 }
 
-function drawPrintArea(ctx, side, product, isCrop = false) {
-  const c = SIDE_CENTER[side];
-  const cx = c.u * ATLAS_SIZE;
-  const cy = c.v * ATLAS_SIZE;
-  const sp = getPrintSpace(product?.printSpace);
-  const wUnits = isCrop ? Math.min(sp.w, 1.32) : sp.w;
-  const hUnits = isCrop ? Math.min(sp.h, 1.08) : sp.h;
-  const w = wUnits * PPU;
-  const h = hUnits * PPU;
-  const yCenter = isCrop ? cy - 0.51 * PPU : cy - 0.16 * PPU;
-  const x0 = cx - w / 2;
-  const y0 = yCenter - h / 2;
+function drawElementSpaceLimit(ctx, el, cx, cy, fallbackSpaceId) {
+  const sp = getPrintSpace(el.space || fallbackSpaceId);
+  if (sp.unlimited) return;
+  const w = sp.w * PPU;
+  const h = sp.h * PPU;
+  const ex = cx + el.x * PPU;
+  const ey = cy + el.y * PPU;
+  const x0 = ex - w / 2;
+  const y0 = ey - h / 2;
 
   ctx.save();
-  ctx.strokeStyle = 'rgba(37, 99, 235, 0.42)';
+  ctx.strokeStyle = 'rgba(37, 99, 235, 0.55)';
   ctx.lineWidth = 2.5;
-  ctx.setLineDash([14, 10]);
+  ctx.setLineDash([12, 9]);
   ctx.strokeRect(x0, y0, w, h);
   ctx.setLineDash([]);
-  ctx.fillStyle = 'rgba(37, 99, 235, 0.72)';
-  ctx.font = '600 22px Inter, sans-serif';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'bottom';
-  ctx.fillText(sp.unlimited ? 'Sin límite' : `${sp.label} · ${sp.desc}`, x0 + 6, y0 - 8);
+  ctx.fillStyle = 'rgba(37, 99, 235, 0.85)';
+  ctx.font = '600 20px Inter, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText(`${sp.label} · ${sp.desc}`, ex, y0 + h + 8);
   ctx.restore();
 }
 
@@ -413,9 +410,11 @@ export function paintAtlas(ctx, { elements, product, guides = true, selectedId =
       drawElement(ctx, el, PPU, cx, cy);
     }
     if (guides) {
-      drawPrintArea(ctx, side, product, ref.fit === 'crop');
       const sel = elements[side].find((e) => e.id === selectedId);
-      if (sel) drawGuides(ctx, sel, cx, cy);
+      if (sel) {
+        drawElementSpaceLimit(ctx, sel, cx, cy, product?.printSpace);
+        drawGuides(ctx, sel, cx, cy);
+      }
     }
     ctx.restore();
   }

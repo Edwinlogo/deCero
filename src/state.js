@@ -122,6 +122,7 @@ export function addElement(el, targetSide = null) {
   commit();
   el.id = newId();
   el.side = targetSide || state.side;
+  el.space ??= state.product.printSpace || 'grande';
   el.x ??= 0;
   el.y ??= -0.15;
   el.rot ??= 0;
