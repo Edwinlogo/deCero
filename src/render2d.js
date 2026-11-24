@@ -89,9 +89,20 @@ function localSize(el) {
   }
 }
 
+export const CM_PER_UNIT = 20; // 1 unidad de diseño = 20 cm (Carta 1.08×1.4 = 21.6×28 cm)
+
 export function getBounds(el) {
   const b = localSize(el);
   return { w: (b.w * el.s) / 100, h: (b.h * el.s) / 100 };
+}
+
+/** Dimensiones reales aproximadas del elemento en cm y área en cm². */
+export function getElementSizeCm(el) {
+  const b = getBounds(el);
+  const wCm = Math.max(1, Math.round(b.w * CM_PER_UNIT * 10) / 10);
+  const hCm = Math.max(1, Math.round(b.h * CM_PER_UNIT * 10) / 10);
+  const areaCm2 = Math.max(1, Math.round(wCm * hCm));
+  return { wCm, hCm, areaCm2 };
 }
 
 /** Escala máxima permitida para un elemento según el espacio de impresión seleccionado. */

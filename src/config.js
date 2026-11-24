@@ -6,16 +6,17 @@ export const CONFIG = {
   // Número de WhatsApp con código de país, sin "+" (ej: '573001234567'). Si está vacío no se muestra el botón.
   whatsapp: '',
   prices: {
+    specialPerCm2: 200, // diseños especiales: $200 por cm²
     bulkMinQty: 6, // descuento por volumen desde esta cantidad
     bulkDiscount: 0.12,
   },
   adultSizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
   kidsSizes: ['2 - 4', '6 - 8', '10 - 12', '14 - 16'],
   printSpaces: [
-    { id: 'pequeno', label: 'Pequeño', desc: '7cm × 7cm', w: 0.4, h: 0.4, unlimited: false, price: 4500 },
-    { id: 'mediano', label: 'Mediano', desc: '15cm × 15cm', w: 0.78, h: 0.78, unlimited: false, price: 8000 },
-    { id: 'grande', label: 'Grande', desc: 'Carta', w: 1.08, h: 1.4, unlimited: false, price: 10000 },
-    { id: 'especial', label: 'Diseño especiales', desc: 'Tamaño sin límite', w: 1.48, h: 2.05, unlimited: true, priceMin: 12000, priceMax: 15000 },
+    { id: 'pequeno', label: 'Pequeño', desc: '7cm × 7cm', w: 0.4, h: 0.4, price: 4500, unlimited: false },
+    { id: 'mediano', label: 'Mediano', desc: '15cm × 15cm', w: 0.78, h: 0.78, price: 8000, unlimited: false },
+    { id: 'grande', label: 'Grande', desc: 'Carta', w: 1.08, h: 1.4, price: 10000, unlimited: false },
+    { id: 'especial', label: 'Diseño especiales', desc: '$200 / cm²', w: 1.48, h: 2.05, pricePerCm2: 200, unlimited: true },
   ],
   productLines: [
     {
@@ -118,19 +119,11 @@ export function getPrintSpace(spaceId) {
   return CONFIG.printSpaces.find((s) => s.id === spaceId) || CONFIG.printSpaces[2];
 }
 
-/** Precio de un estampado según su tamaño y la talla de la camisa (12.000 a 15.000 en diseño especial). */
-export function getPrintSpacePrice(spaceId, shirtSize = 'M', audience = 'Hombre') {
-  const sp = getPrintSpace(spaceId);
-  if (!sp.unlimited) return sp.price;
-  if (audience === 'Niños' || shirtSize === 'XS' || shirtSize === 'S') return 12000;
-  if (shirtSize === 'XL' || shirtSize === 'XXL') return 15000;
-  return 13500; // M y L
-}
-
 export function money(v) {
   return new Intl.NumberFormat(CONFIG.locale, {
     style: 'currency',
     currency: CONFIG.currency,
+    minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(Math.round(v));
 }

@@ -1,5 +1,6 @@
 // Estado global del editor + eventos + historial (deshacer / rehacer).
-import { CONFIG, getLine, getReference, getSizesForAudience, getPrintSpace, getPrintSpacePrice } from './config.js';
+import { CONFIG, getLine, getReference, getSizesForAudience, getPrintSpace } from './config.js';
+import { getElementSizeCm } from './render2d.js';
 
 const listeners = {};
 export const on = (ev, fn) => {
@@ -199,11 +200,19 @@ export function priceInfo(product = state.product, elements = state.elements) {
     const sideLabel = side === 'front' ? 'Frente' : 'Espalda';
     for (const el of visible) {
       const sp = getPrintSpace(el.space || product.printSpace);
-      const amount = getPrintSpacePrice(sp.id, product.size, product.audience);
-      lines.push({
-        label: `Estampado ${sideLabel} · ${sp.label} (${sp.desc})`,
-        amount,
-      });
+      if (sp.unlimited) {
+        const { wCm, hCm, areaCm2 } = getElementSizeCm(el);
+        const rate = sp.pricePerCm2 || P.specialPerCm2 || 200;
+        lines.push({
+          label: `Diseño ${sideLabel} · Especial (${Math.round(wCm)}×${Math.round(hCm)} cm · ${areaCm2} cm²)`,
+          amount: areaCm2 * rate,
+        });
+      } else {
+        lines.push({
+          label: `Diseño ${sideLabel} · ${sp.label} (${sp.desc})`,
+          amount: sp.price,
+        });
+      }
     }
   }
   const unit = lines.reduce((a, l) => a + l.amount, 0);

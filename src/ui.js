@@ -1,5 +1,5 @@
 // Interfaz de usuario: flotantes laterales, maximizar 3D, prenda por línea, diseño, capas y liquidación de precio.
-import { CONFIG, getLine, getReference, getSizesForAudience, getPrintSpace, getPrintSpacePrice, money } from './config.js';
+import { CONFIG, getLine, getReference, getSizesForAudience, getPrintSpace, money } from './config.js';
 import {
   state, defaultProduct, normalizeProduct, on, emit, images, selected, addElement, removeElement, selectElement, duplicateElement, moveLayer, clearSide,
   commit, changed, undo, redo, canUndo, canRedo, priceInfo, registerImage, newId, serializeDesign, loadDesign, loadImage,
@@ -196,7 +196,6 @@ export function initUI(viewer) {
     });
 
     renderPrice();
-    renderLayers();
   }
 
   function renderPrice() {
@@ -485,16 +484,13 @@ export function initUI(viewer) {
           selectElement(el.id);
           changed(true, el.side);
         },
-      }, ...CONFIG.printSpaces.map((sp) => {
-        const priceTxt = sp.unlimited
-          ? `${money(getPrintSpacePrice(sp.id, state.product.size, state.product.audience))}`
-          : money(sp.price);
-        return h('option', {
-          value: sp.id,
-          text: `${sp.label} · ${sp.desc} (${priceTxt})`,
-          selected: (el.space || state.product.printSpace) === sp.id,
-        });
-      }));
+      }, ...CONFIG.printSpaces.map((sp) => h('option', {
+        value: sp.id,
+        text: sp.unlimited
+          ? `${sp.label} · ${money(sp.pricePerCm2)}/cm²`
+          : `${sp.label} · ${sp.desc} (${money(sp.price)})`,
+        selected: (el.space || state.product.printSpace) === sp.id,
+      })));
 
       const card = h('li', {
         class: 'layer-card' + (isSelected ? ' active' : '') + (el.hidden ? ' off' : ''),
@@ -543,7 +539,10 @@ export function initUI(viewer) {
     if (state.selectedId && state.selectedId !== lastSel) showTab('add');
     lastSel = state.selectedId;
   });
-  on('design', () => binders.forEach((f) => f()));
+  on('design', () => {
+    binders.forEach((f) => f());
+    renderPrice();
+  });
   on('side', renderLayers);
   $('#btn-clear-side').onclick = () => clearSide(state.side);
 
