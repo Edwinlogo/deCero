@@ -333,7 +333,7 @@ function drawGuides(ctx, el, cx, cy) {
   ctx.restore();
 }
 
-function drawPrintArea(ctx, side) {
+function drawPrintArea(ctx, side, isCrop = false) {
   const c = SIDE_CENTER[side];
   const cx = c.u * ATLAS_SIZE;
   const cy = c.v * ATLAS_SIZE;
@@ -341,9 +341,10 @@ function drawPrintArea(ctx, side) {
   ctx.strokeStyle = 'rgba(59, 130, 246, 0.35)';
   ctx.lineWidth = 2.5;
   ctx.setLineDash([16, 12]);
-  const w = 1.48 * PPU;
-  const h = 2.05 * PPU;
-  ctx.strokeRect(cx - w / 2, cy - h / 2 - 0.08 * PPU, w, h);
+  const w = (isCrop ? 1.32 : 1.48) * PPU;
+  const h = (isCrop ? 1.08 : 2.05) * PPU;
+  const yTop = isCrop ? cy - 1.05 * PPU : cy - h / 2 - 0.08 * PPU;
+  ctx.strokeRect(cx - w / 2, yTop, w, h);
   ctx.restore();
 }
 
@@ -389,7 +390,7 @@ export function paintAtlas(ctx, { elements, product, guides = true, selectedId =
       drawElement(ctx, el, PPU, cx, cy);
     }
     if (guides) {
-      drawPrintArea(ctx, side);
+      drawPrintArea(ctx, side, ref.fit === 'crop');
       const sel = elements[side].find((e) => e.id === selectedId);
       if (sel) drawGuides(ctx, sel, cx, cy);
     }

@@ -1,4 +1,5 @@
-// Escena 3D fotorrealista: modelo GLB real, PBR textil, iluminación HDR de estudio y edición directa.
+// Escena 3D fotorrealista: 4 modelos GLB reales (hombre, mujer, niños sin pliegues, crop top),
+// PBR textil, iluminación HDR de estudio y edición directa por raycasting UV.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
@@ -6,6 +7,49 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { ATLAS_SIZE, paintAtlas, uvToDesign, hitHandle, hitElement } from './render2d.js';
 import { state, on, emit, selected, selectElement, removeElement, commit, changed } from './state.js';
 import { getReference } from './config.js';
+
+const MODEL_SPECS = {
+  male: {
+    url: '/models/shirt_baked.glb',
+    ao: 0.95,
+    normal: 1.15,
+    yOffset: 0.04,
+    shadowY: -1.44,
+    shadowScale: [1, 1],
+  },
+  women: {
+    url: '/models/shirt_women.glb',
+    ao: 0.72,
+    normal: 0.95,
+    yOffset: 0.05,
+    shadowY: -1.42,
+    shadowScale: [0.92, 0.94],
+  },
+  kids: {
+    url: '/models/shirt_kids.glb',
+    ao: 0.22,
+    normal: 0.55,
+    yOffset: 0.06,
+    shadowY: -1.28,
+    shadowScale: [0.85, 0.88],
+  },
+  crop: {
+    url: '/models/shirt_crop.glb',
+    ao: 0.68,
+    normal: 0.95,
+    yOffset: 0.12,
+    shadowY: -0.96,
+    shadowScale: [0.88, 0.88],
+  },
+};
+
+function resolveModelKey() {
+  const ref = getReference(state.product.line, state.product.reference);
+  if (ref.fit === 'crop') return 'crop';
+  if (state.product.audience === 'Niños') return 'kids';
+  if (state.product.audience === 'Mujer') return 'women';
+  return 'male';
+}
 
 function createSoftShadowTexture() {
   const c = document.createElement('canvas');
@@ -17,8 +61,7 @@ function createSoftShadowTexture() {
   g.addColorStop(1, 'rgba(15, 23, 42, 0)');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 256, 256);
-  const t = new THREE.CanvasTexture(c);
-  return t;
+  return new THREE.CanvasTexture(c);
 }
 
 export function createViewer(container) {
@@ -100,53 +143,65 @@ export function createViewer(container) {
   atlasTex.colorSpace = THREE.SRGBColorSpace;
   atlasTex.anisotropy = maxAniso;
 
-  // ---------- Grupo de la camiseta GLB ----------
+  // ---------- Gestión multi-modelo GLB ----------
   const shirtGroup = new THREE.Group();
   scene.add(shirtGroup);
-  let shirtMesh = null;
-  let baseScale = 1;
-  let targetScaleVec = new THREE.Vector3(1, 1, 1);
-
-  let readyResolve;
-  const ready = new Promise((r) => (readyResolve = r));
 
   const loader = new GLTFLoader();
-  loader.load(
-    '/models/shirt_baked.glb',
-    (gltf) => {
+  const loadedModels = new Map(); // key -> { root, mesh, material }
+  const loadingPromises = new Map();
+  let sharedMaps = { normalMap: null, aoMap: null };
+  let baseScale = 4.35; // calibrado al cargar el modelo base male
+  let activeModelKey = null;
+  let activeMesh = null;
+  const targetScaleVec = new THREE.Vector3(1, 1, 1);
+
+  function loadGLTF(url) {
+    return new Promise((resolve, reject) => loader.load(url, resolve, undefined, reject));
+  }
+
+  async function ensureModel(modelKey) {
+    if (loadedModels.has(modelKey)) return loadedModels.get(modelKey);
+    if (loadingPromises.has(modelKey)) return loadingPromises.get(modelKey);
+
+    const spec = MODEL_SPECS[modelKey] || MODEL_SPECS.male;
+    const p = (async () => {
+      const gltf = await loadGLTF(spec.url);
       const root = gltf.scene;
-      // Normalizar escala y centrar geometría
       const box = new THREE.Box3().setFromObject(root);
       const size = new THREE.Vector3();
       const center = new THREE.Vector3();
       box.getSize(size);
       box.getCenter(center);
 
-      const desiredHeight = 2.65;
-      baseScale = desiredHeight / size.y;
+      if (modelKey === 'male') {
+        baseScale = 2.65 / (size.y || 0.61);
+      }
 
+      let mesh = null;
+      let material = null;
       root.traverse((obj) => {
         if (!obj.isMesh) return;
-        shirtMesh = obj;
-
-        // Asegurar uv1 para que aoMap use las mismas coordenadas UV0 del GLB
+        mesh = obj;
         if (obj.geometry.attributes.uv && !obj.geometry.attributes.uv1) {
           obj.geometry.setAttribute('uv1', obj.geometry.attributes.uv);
         }
-
         const orig = obj.material;
-        const normalMap = orig?.normalMap || null;
-        const aoMap = orig?.aoMap || null;
-        if (normalMap) {
-          normalMap.anisotropy = maxAniso;
+        if (modelKey === 'male') {
+          if (orig?.normalMap) {
+            orig.normalMap.anisotropy = maxAniso;
+            sharedMaps.normalMap = orig.normalMap;
+          }
+          if (orig?.aoMap) {
+            sharedMaps.aoMap = orig.aoMap;
+          }
         }
-
-        obj.material = new THREE.MeshPhysicalMaterial({
+        material = new THREE.MeshPhysicalMaterial({
           map: atlasTex,
-          normalMap,
-          normalScale: new THREE.Vector2(1.15, 1.15),
-          aoMap,
-          aoMapIntensity: 0.95,
+          normalMap: sharedMaps.normalMap,
+          normalScale: new THREE.Vector2(spec.normal, spec.normal),
+          aoMap: sharedMaps.aoMap,
+          aoMapIntensity: spec.ao,
           roughness: 0.88,
           metalness: 0.0,
           sheen: 0.16,
@@ -154,49 +209,72 @@ export function createViewer(container) {
           sheenColor: new THREE.Color(0xdbe4f0),
           side: THREE.DoubleSide,
         });
-
+        obj.material = material;
         obj.castShadow = true;
         obj.receiveShadow = true;
       });
 
-      root.position.set(-center.x * baseScale, -center.y * baseScale + 0.04, -center.z * baseScale);
+      root.position.set(-center.x * baseScale, -center.y * baseScale + spec.yOffset, -center.z * baseScale);
       root.scale.setScalar(baseScale);
+      root.visible = false;
       shirtGroup.add(root);
 
-      applyProduct();
-      dirty = true;
-      flush();
-      readyResolve();
-    },
-    undefined,
-    (err) => {
-      console.error('Error cargando modelo 3D:', err);
-      readyResolve();
-    },
-  );
+      const entry = { root, mesh, material, spec };
+      loadedModels.set(modelKey, entry);
+      loadingPromises.delete(modelKey);
+      return entry;
+    })();
 
-  function applyProduct() {
+    loadingPromises.set(modelKey, p);
+    return p;
+  }
+
+  let switchToken = 0;
+  async function syncModel() {
+    const key = resolveModelKey();
     const ref = getReference(state.product.line, state.product.reference);
-    switch (ref.fit) {
-      case 'oversize':
-        targetScaleVec.set(1.08, 1.04, 1.09);
-        break;
-      case 'heavy':
-        targetScaleVec.set(1.03, 1.01, 1.04);
-        break;
-      case 'fitted':
-        targetScaleVec.set(0.94, 0.98, 0.94);
-        break;
-      case 'crop':
-        targetScaleVec.set(0.96, 0.8, 0.95);
-        break;
-      case 'kids':
-        targetScaleVec.set(0.88, 0.88, 0.88);
-        break;
-      default:
-        targetScaleVec.set(1, 1, 1);
+
+    // Ajuste fino de silueta según referencia (oversize, pesada, regular)
+    if (key === 'male' || key === 'women') {
+      if (ref.fit === 'oversize') targetScaleVec.set(1.08, 1.04, 1.09);
+      else if (ref.fit === 'heavy') targetScaleVec.set(1.03, 1.01, 1.04);
+      else if (ref.fit === 'fitted') targetScaleVec.set(0.97, 0.99, 0.97);
+      else targetScaleVec.set(1, 1, 1);
+    } else if (key === 'kids') {
+      targetScaleVec.set(0.94, 0.94, 0.94);
+    } else {
+      // crop top
+      targetScaleVec.set(1.02, 1.02, 1.02);
+    }
+
+    if (key === activeModelKey && loadedModels.has(key)) return;
+    const token = ++switchToken;
+    try {
+      const entry = await ensureModel(key);
+      if (token !== switchToken) return;
+      for (const [k, item] of loadedModels.entries()) {
+        item.root.visible = k === key;
+      }
+      activeModelKey = key;
+      activeMesh = entry.mesh;
+      contactShadow.position.y = entry.spec.shadowY;
+      contactShadow.scale.set(entry.spec.shadowScale[0], entry.spec.shadowScale[1], 1);
+      shadowFloor.position.y = entry.spec.shadowY - 0.01;
+      dirty = true;
+    } catch (err) {
+      console.error(`Error cargando modelo ${key}:`, err);
     }
   }
+
+  // Cargar modelo base primero (extrae mapas PBR compartidos) y precargar variantes en segundo plano
+  const ready = (async () => {
+    await ensureModel('male');
+    await syncModel();
+    dirty = true;
+    flush();
+    // Precarga silenciosa de las otras 3 variantes para cambio instantáneo
+    Promise.all(['women', 'kids', 'crop'].map((k) => ensureModel(k).catch(() => null)));
+  })();
 
   // ---------- Pintado de textura ----------
   let dirty = true;
@@ -222,7 +300,7 @@ export function createViewer(container) {
     dirty = true;
   });
   on('product', () => {
-    applyProduct();
+    syncModel();
     dirty = true;
   });
 
@@ -257,11 +335,11 @@ export function createViewer(container) {
   const ndc = new THREE.Vector2();
 
   function pick(e, forceSide = null) {
-    if (!shirtMesh) return null;
+    if (!activeMesh) return null;
     const r = canvas.getBoundingClientRect();
     ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     ray.setFromCamera(ndc, camera);
-    const hit = ray.intersectObject(shirtMesh, false)[0];
+    const hit = ray.intersectObject(activeMesh, false)[0];
     if (!hit || !hit.uv) return null;
     return uvToDesign(hit.uv.x, hit.uv.y, forceSide);
   }
@@ -496,9 +574,16 @@ export function createViewer(container) {
     return out;
   }
 
-  applyProduct();
   resize();
   setView('front', false);
 
-  return { ready, capture, setView, setAutoRotate, resize, get autoRotate() { return autoRotate; } };
+  return {
+    ready,
+    capture,
+    setView,
+    setAutoRotate,
+    resize,
+    get autoRotate() { return autoRotate; },
+    get modelKey() { return activeModelKey; },
+  };
 }
