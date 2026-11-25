@@ -319,10 +319,9 @@ export function initUI(viewer) {
         space: spId,
         x: spot ? spot.x : 0,
         y: spot ? spot.y : -0.25,
-        s: 1.1,
+        s: 1,
       };
-      const maxS = maxScaleForElement(imgEl, spId);
-      imgEl.s = Math.min(imgEl.s, maxS * 0.92);
+      imgEl.s = maxScaleForElement(imgEl, spId);
       addElement(imgEl, spot?.side || null);
     } catch {
       toast('No se pudo leer la imagen');
@@ -582,6 +581,10 @@ export function initUI(viewer) {
         onchange: (e) => {
           commit();
           el.space = e.target.value;
+          const sp = getPrintSpace(el.space);
+          if (el.type === 'image' && !sp.unlimited) {
+            el.s = maxScaleForElement(el, el.space);
+          }
           focusElement(el);
           changed(true, el.side);
         },

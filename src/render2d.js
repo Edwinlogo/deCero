@@ -129,15 +129,18 @@ export function getEffectiveSpace(el, fallbackSpaceId = null) {
   return { ...sp, desc: `${sp.desc} vertical` };
 }
 
-/** Escala máxima permitida para un elemento según el espacio de impresión seleccionado. */
+/** Escala máxima para maximizar un elemento dentro de su espacio de impresión seleccionado. */
 export function maxScaleForElement(el, spaceId) {
   const sp = getEffectiveSpace({ ...el, space: spaceId || el?.space }, spaceId);
   if (sp.unlimited) return 8;
   const b = localSize(el);
-  const bw = b.w / 100;
-  const bh = b.h / 100;
+  const a = ((el?.rot || 0) * Math.PI) / 180;
+  const cos = Math.abs(Math.cos(a));
+  const sin = Math.abs(Math.sin(a));
+  const bw = (b.w * cos + b.h * sin) / 100;
+  const bh = (b.w * sin + b.h * cos) / 100;
   if (bw <= 0 || bh <= 0) return 4.5;
-  return Math.max(0.1, Math.min(sp.w / bw, sp.h / bh));
+  return Math.max(0.01, Math.min(sp.w / bw, sp.h / bh));
 }
 
 function drawTextLine(ctx, text, width, y, el, maxW) {
