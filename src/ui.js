@@ -728,9 +728,9 @@ export function initUI(viewer) {
     state.guides = !state.guides;
     const btn = e.currentTarget;
     btn.classList.toggle('active', state.guides);
-    btn.innerHTML = state.guides ? PENCIL_SVG : LOCK_SVG;
+    btn.innerHTML = state.guides ? LOCK_SVG : PENCIL_SVG;
     btn.title = state.guides ? 'Edición activa (pulsar para bloquear)' : 'Diseño bloqueado (pulsar para editar)';
-    btn.setAttribute('aria-label', state.guides ? 'Edición activa' : 'Diseño bloqueado');
+    btn.setAttribute('aria-label', state.guides ? 'Bloquear edición' : 'Activar edición');
     emit('design');
   };
   setTimeout(() => $('#stage-hint').classList.add('fade'), 9000);
