@@ -277,12 +277,38 @@ export function drawElement(ctx, el, ppu = PPU, cx = 0, cy = 0) {
   ctx.restore();
 }
 
+function visibleBounds(el) {
+  const b = getBounds(el);
+  const sp = getPrintSpace(el.space);
+  if (sp.unlimited) return b;
+  return { w: Math.min(b.w, sp.w), h: Math.min(b.h, sp.h) };
+}
+
+function drawClippedElement(ctx, el, ppu = PPU, cx = 0, cy = 0, fallbackSpaceId = null) {
+  if (el.hidden) return;
+  const sp = getPrintSpace(el.space || fallbackSpaceId);
+  if (sp.unlimited) {
+    drawElement(ctx, el, ppu, cx, cy);
+    return;
+  }
+  const w = sp.w * ppu;
+  const h = sp.h * ppu;
+  const ex = cx + el.x * ppu;
+  const ey = cy + el.y * ppu;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(ex - w / 2, ey - h / 2, w, h);
+  ctx.clip();
+  drawElement(ctx, el, ppu, cx, cy);
+  ctx.restore();
+}
+
 // ---------- Guías de edición ----------
 const PAD = 0.04;
 const HANDLE_R = 0.065;
 
 function handlePositions(el) {
-  const b = getBounds(el);
+  const b = visibleBounds(el);
   const hw = b.w / 2 + PAD;
   const hh = b.h / 2 + PAD;
   return {
@@ -308,6 +334,10 @@ export function hitHandle(el, pt) {
 
 export function hitElement(el, pt) {
   if (el.hidden) return false;
+  const sp = getPrintSpace(el.space);
+  if (!sp.unlimited) {
+    if (Math.abs(pt.x - el.x) > sp.w / 2 + 0.02 || Math.abs(pt.y - el.y) > sp.h / 2 + 0.02) return false;
+  }
   const b = getBounds(el);
   const a = (-el.rot * Math.PI) / 180;
   const dx = pt.x - el.x;
@@ -318,7 +348,7 @@ export function hitElement(el, pt) {
 }
 
 function drawGuides(ctx, el, cx, cy) {
-  const b = getBounds(el);
+  const b = visibleBounds(el);
   const hw = b.w / 2 + PAD;
   const hh = b.h / 2 + PAD;
   ctx.save();
@@ -418,7 +448,7 @@ export function paintAtlas(ctx, { elements, product, guides = true, selectedId =
     ctx.clip();
 
     for (const el of elements[side]) {
-      drawElement(ctx, el, PPU, cx, cy);
+      drawClippedElement(ctx, el, PPU, cx, cy, product?.printSpace);
     }
     if (guides) {
       const sel = elements[side].find((e) => e.id === selectedId);
@@ -440,10 +470,15 @@ export function exportArt(elements, side, scale = 2.5) {
   let x1 = -Infinity;
   let y1 = -Infinity;
   for (const el of list) {
+    const sp = getPrintSpace(el.space);
     const b = getBounds(el);
     const a = (el.rot * Math.PI) / 180;
-    const ex = (Math.abs(b.w * Math.cos(a)) + Math.abs(b.h * Math.sin(a))) / 2;
-    const ey = (Math.abs(b.w * Math.sin(a)) + Math.abs(b.h * Math.cos(a))) / 2;
+    let ex = (Math.abs(b.w * Math.cos(a)) + Math.abs(b.h * Math.sin(a))) / 2;
+    let ey = (Math.abs(b.w * Math.sin(a)) + Math.abs(b.h * Math.cos(a))) / 2;
+    if (!sp.unlimited) {
+      ex = Math.min(ex, sp.w / 2);
+      ey = Math.min(ey, sp.h / 2);
+    }
     x0 = Math.min(x0, el.x - ex);
     x1 = Math.max(x1, el.x + ex);
     y0 = Math.min(y0, el.y - ey);
@@ -454,6 +489,6 @@ export function exportArt(elements, side, scale = 2.5) {
   c.width = Math.max(1, Math.ceil((x1 - x0) * ppu));
   c.height = Math.max(1, Math.ceil((y1 - y0) * ppu));
   const ctx = c.getContext('2d');
-  for (const el of list) drawElement(ctx, el, ppu, -x0 * ppu, -y0 * ppu);
+  for (const el of list) drawClippedElement(ctx, el, ppu, -x0 * ppu, -y0 * ppu);
   return c;
 }

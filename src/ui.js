@@ -1,7 +1,7 @@
 // Interfaz de usuario: flotantes laterales, maximizar 3D, prenda por línea, diseño, capas y liquidación de precio.
 import { CONFIG, getLine, getReference, getSizesForAudience, getPrintSpace, money } from './config.js';
 import {
-  state, defaultProduct, normalizeProduct, on, emit, images, selected, addElement, removeElement, selectElement, duplicateElement, moveLayer, clearSide,
+  state, defaultProduct, normalizeProduct, on, emit, images, selected, addElement, removeElement, selectElement, duplicateElement, moveLayer, clearAll,
   commit, changed, undo, redo, canUndo, canRedo, priceInfo, registerImage, newId, serializeDesign, loadDesign, loadImage,
 } from './state.js';
 import { exportArt, maxScaleForElement } from './render2d.js';
@@ -438,17 +438,8 @@ export function initUI(viewer) {
       panel.append(range(el, 'strokeW', 'Grosor del contorno', 0, 14, 0.5));
     }
 
-    // Opciones principales: Tamaño (1% al 200%), Rotación (0° a 360°) y Opacidad (10% al 100%)
-    panel.append(range(
-      el,
-      's',
-      'Tamaño',
-      0.01,
-      2,
-      0.01,
-      (v) => Math.round(v * 100) + '%',
-      (v) => Math.min(v, maxScaleForElement(el, el.space || state.product.printSpace)),
-    ));
+    // Opciones principales: Tamaño (1% al 200%, recortado al área de impresión), Rotación (0° a 360°) y Opacidad (10% al 100%)
+    panel.append(range(el, 's', 'Tamaño', 0.01, 2, 0.01, (v) => Math.round(v * 100) + '%'));
     panel.append(range(el, 'rot', 'Rotación', 0, 360, 1, (v) => Math.round(v) + '°'));
     panel.append(range(el, 'opacity', 'Opacidad', 0.1, 1, 0.01, (v) => Math.round(v * 100) + '%'));
 
@@ -464,14 +455,24 @@ export function initUI(viewer) {
 
   function renderLayers() {
     binders = [];
-    $('#side-label').textContent = state.side === 'front' ? 'Frente' : 'Espalda';
     layersEl.innerHTML = '';
-    const list = state.elements[state.side];
+    const list = [
+      ...[...state.elements.front].reverse(),
+      ...[...state.elements.back].reverse(),
+    ];
+    const countEl = $('#layers-count');
+    if (countEl) countEl.textContent = list.length ? `(${list.length})` : '';
     if (expandedId && !list.some((e) => e.id === expandedId)) expandedId = null;
 
-    [...list].reverse().forEach((el) => {
+    const focusElement = (el) => {
+      if (el.side !== state.side) viewer.setView(el.side);
+      selectElement(el.id);
+    };
+
+    list.forEach((el) => {
       const isSelected = el.id === state.selectedId;
       const isExpanded = el.id === expandedId;
+      const sideBadge = el.side === 'front' ? 'Frente' : 'Espalda';
 
       const sizeSel = h('select', {
         'aria-label': 'Tamaño límite',
@@ -479,9 +480,7 @@ export function initUI(viewer) {
         onchange: (e) => {
           commit();
           el.space = e.target.value;
-          const maxS = maxScaleForElement(el, el.space);
-          if (el.s > maxS) el.s = maxS;
-          selectElement(el.id);
+          focusElement(el);
           changed(true, el.side);
         },
       }, ...CONFIG.printSpaces.map((sp) => h('option', {
@@ -496,9 +495,10 @@ export function initUI(viewer) {
         class: 'layer-card' + (isSelected ? ' active' : '') + (el.hidden ? ' off' : ''),
         'data-id': el.id,
       },
-      h('div', { class: 'layer-head', onclick: () => selectElement(el.id) },
+      h('div', { class: 'layer-head', onclick: () => focusElement(el) },
         h('div', { class: 'thumb' }, layerThumb(el)),
         h('div', { class: 'name', text: layerLabel(el) }),
+        h('span', { class: 'layer-side', text: sideBadge }),
         h('div', { class: 'layer-actions' },
           h('button', {
             class: 'layer-icon' + (isExpanded ? ' active' : ''),
@@ -508,8 +508,13 @@ export function initUI(viewer) {
             onclick: (e) => {
               e.stopPropagation();
               expandedId = isExpanded ? null : el.id;
-              if (!isExpanded && state.selectedId !== el.id) selectElement(el.id);
-              else renderLayers();
+              if (!isExpanded) {
+                if (el.side !== state.side) viewer.setView(el.side);
+                if (state.selectedId !== el.id) selectElement(el.id);
+                else renderLayers();
+              } else {
+                renderLayers();
+              }
             },
           }),
           h('button', {
@@ -543,8 +548,7 @@ export function initUI(viewer) {
     binders.forEach((f) => f());
     renderPrice();
   });
-  on('side', renderLayers);
-  $('#btn-clear-side').onclick = () => clearSide(state.side);
+  $('#btn-clear-side').onclick = () => clearAll();
 
   // ---------------- Controles flotantes: Menús de Vistas y Fondo ----------------
   const viewPopover = $('#view-popover');

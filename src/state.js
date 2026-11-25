@@ -186,6 +186,15 @@ export function clearSide(side) {
   changed(true, side);
 }
 
+export function clearAll() {
+  if (!state.elements.front.length && !state.elements.back.length) return;
+  commit();
+  state.elements.front = [];
+  state.elements.back = [];
+  state.selectedId = null;
+  changed(true);
+}
+
 // ---------- Precio ----------
 export function priceInfo(product = state.product, elements = state.elements) {
   const P = CONFIG.prices;
