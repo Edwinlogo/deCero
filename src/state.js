@@ -50,9 +50,7 @@ export function normalizeProduct(p) {
   if (!CONFIG.colors.some((c) => c.hex.toLowerCase() === (p.collarColor || '').toLowerCase())) {
     p.collarColor = CONFIG.colors.find((c) => c.name === 'Negro')?.hex || CONFIG.colors[0].hex;
   }
-  if (!CONFIG.printSpaces.some((s) => s.id === p.printSpace)) {
-    p.printSpace = 'grande';
-  }
+  p.printSpace = 'grande';
   return p;
 }
 
@@ -143,7 +141,7 @@ export function addElement(el, targetSide = null) {
   commit();
   el.id = newId();
   el.side = targetSide || state.side;
-  el.space ??= state.product.printSpace || 'grande';
+  el.space ??= 'grande';
   el.x ??= 0;
   el.y ??= -0.15;
   el.rot ??= 0;

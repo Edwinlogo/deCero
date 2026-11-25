@@ -310,7 +310,7 @@ export function initUI(viewer) {
       const src = file.type === 'image/jpeg' ? c.toDataURL('image/jpeg', 0.92) : c.toDataURL('image/png');
       const id = newId('img');
       await registerImage(id, src);
-      const spId = state.product.printSpace;
+      const spId = 'grande';
       const imgEl = {
         type: 'image',
         imgId: id,
@@ -574,6 +574,7 @@ export function initUI(viewer) {
       const isExpanded = el.id === expandedId;
       const sideBadge = SIDE_LABELS[el.side] || el.side;
 
+      const currentSpace = el.space || 'grande';
       const sizeSel = h('select', {
         'aria-label': 'Área de impresión',
         onclick: (e) => e.stopPropagation(),
@@ -588,8 +589,9 @@ export function initUI(viewer) {
         text: sp.unlimited
           ? `${sp.label} · ${money(sp.pricePerCm2)}/cm²`
           : `${sp.label} · ${sp.desc} (${money(sp.price)})`,
-        selected: (el.space || state.product.printSpace) === sp.id,
+        selected: currentSpace === sp.id,
       })));
+      sizeSel.value = currentSpace;
 
       const card = h('li', {
         class: 'layer-card' + (isSelected ? ' active' : '') + (el.hidden ? ' off' : ''),
