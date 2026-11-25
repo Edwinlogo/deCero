@@ -437,7 +437,7 @@ export function createViewer(container) {
         const { pt } = hit;
         if (drag.mode === 'scale') {
           const d = Math.hypot(pt.x - el.x, pt.y - el.y);
-          el.s = Math.max(0.01, Math.min(2, drag.s0 * (d / drag.d0)));
+          el.s = Math.max(0.01, drag.s0 * (d / drag.d0));
         } else if (drag.mode === 'rotate') {
           const a = Math.atan2(pt.y - el.y, pt.x - el.x);
           let r = drag.rot0 + ((a - drag.a0) * 180) / Math.PI;

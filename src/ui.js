@@ -424,6 +424,76 @@ export function initUI(viewer) {
     return fld(label, wrap);
   }
 
+  function scaleStepper(el, label) {
+    const input = h('input', { type: 'number', min: 1, step: 1, inputmode: 'numeric', 'aria-label': label });
+    const getPct = () => Math.max(1, Math.round((el.s || 0.01) * 100));
+    const applyPct = (pct) => {
+      const next = Math.max(1, Math.round(pct));
+      begin(el.id + 's');
+      el.s = next / 100;
+      if (document.activeElement !== input) input.value = next;
+      changed(false, el.side);
+    };
+    const sync = () => {
+      if (document.activeElement !== input) input.value = getPct();
+    };
+    input.addEventListener('input', () => {
+      const raw = parseInt(input.value, 10);
+      if (!Number.isFinite(raw) || raw < 1) return;
+      begin(el.id + 's');
+      el.s = raw / 100;
+      changed(false, el.side);
+    });
+    input.addEventListener('blur', () => {
+      const raw = parseInt(input.value, 10);
+      const safe = Number.isFinite(raw) && raw >= 1 ? raw : getPct();
+      input.value = safe;
+      if (safe / 100 !== el.s) applyPct(safe);
+    });
+
+    const makeHoldBtn = (text, dir, aria) => {
+      let timer = null;
+      let interval = null;
+      const stop = () => {
+        clearTimeout(timer);
+        clearInterval(interval);
+        timer = null;
+        interval = null;
+      };
+      const stepOnce = (mult = 1) => {
+        const next = Math.max(1, getPct() + dir * mult);
+        applyPct(next);
+        input.value = next;
+      };
+      const btn = h('button', { type: 'button', text, 'aria-label': aria });
+      btn.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        const mult = e.shiftKey ? 10 : 1;
+        stepOnce(mult);
+        timer = setTimeout(() => {
+          interval = setInterval(() => stepOnce(mult), 55);
+        }, 320);
+      });
+      ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => btn.addEventListener(ev, stop));
+      btn.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          stepOnce(e.shiftKey ? 10 : 1);
+        }
+      });
+      return btn;
+    };
+
+    const wrap = h('div', { class: 'scale-stepper' },
+      makeHoldBtn('−', -1, 'Reducir escala'),
+      h('div', { class: 'scale-input-wrap' }, input, h('span', { class: 'scale-unit', text: '%' })),
+      makeHoldBtn('＋', 1, 'Aumentar escala'));
+
+    binders.push(sync);
+    sync();
+    return fld(label, wrap);
+  }
+
   function buildLayerProps(el) {
     const panel = h('div', { class: 'layer-props' });
 
@@ -471,16 +541,8 @@ export function initUI(viewer) {
       panel.append(range(el, 'strokeW', 'Grosor del contorno', 0, 14, 0.5));
     }
 
-    // Opciones principales: Escala (1% al 200%, recortada al área de impresión), Rotación (0° a 360°) y Opacidad (10% al 100%)
-    panel.append(range(
-      el,
-      's',
-      el.type === 'image' ? 'Escala de imagen' : 'Escala del diseño',
-      0.01,
-      2,
-      0.01,
-      (v) => Math.round(v * 100) + '%',
-    ));
+    // Opciones principales: Escala (1% sin límite superior), Rotación (0° a 360°) y Opacidad (10% al 100%)
+    panel.append(scaleStepper(el, el.type === 'image' ? 'Escala de imagen' : 'Escala del diseño'));
     panel.append(range(el, 'rot', 'Rotación', 0, 360, 1, (v) => Math.round(v) + '°'));
     panel.append(range(el, 'opacity', 'Opacidad', 0.1, 1, 0.01, (v) => Math.round(v * 100) + '%'));
 

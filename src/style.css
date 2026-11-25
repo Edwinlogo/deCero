@@ -310,6 +310,28 @@ h2, h3 { margin: 0; }
 .field > .lbl { display: flex; justify-content: space-between; color: var(--muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; }
 .field > .lbl output { font-weight: 600; color: var(--ink); text-transform: none; letter-spacing: 0; }
 .field input[type='range'] { width: 100%; accent-color: var(--accent); }
+.scale-stepper {
+  display: flex; align-items: stretch; border: 1px solid var(--line); border-radius: 10px;
+  overflow: hidden; background: #fff;
+}
+.scale-stepper > button {
+  width: 40px; border: 0; background: #f8fafc; color: var(--ink); font-size: 17px; font-weight: 700;
+  flex: none; transition: background .12s;
+}
+.scale-stepper > button:hover { background: var(--accent-soft); color: var(--accent); }
+.scale-input-wrap {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 3px;
+  border-left: 1px solid var(--line); border-right: 1px solid var(--line); padding: 0 8px;
+}
+.scale-input-wrap input[type='number'] {
+  width: 100%; max-width: 84px; border: 0; padding: 7px 2px; text-align: center;
+  font-size: 14px; font-weight: 700; color: var(--ink); background: transparent;
+  -moz-appearance: textfield;
+}
+.scale-input-wrap input[type='number']::-webkit-outer-spin-button,
+.scale-input-wrap input[type='number']::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.scale-input-wrap input[type='number']:focus { outline: none; }
+.scale-unit { font-size: 13px; font-weight: 600; color: var(--muted); user-select: none; }
 .field textarea, .field input[type='text'], .form input, .form textarea, #design-name {
   width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; background: #fff; resize: vertical;
 }
