@@ -471,8 +471,16 @@ export function initUI(viewer) {
       panel.append(range(el, 'strokeW', 'Grosor del contorno', 0, 14, 0.5));
     }
 
-    // Opciones principales: Tamaño (1% al 200%, recortado al área de impresión), Rotación (0° a 360°) y Opacidad (10% al 100%)
-    panel.append(range(el, 's', 'Tamaño', 0.01, 2, 0.01, (v) => Math.round(v * 100) + '%'));
+    // Opciones principales: Escala (1% al 200%, recortada al área de impresión), Rotación (0° a 360°) y Opacidad (10% al 100%)
+    panel.append(range(
+      el,
+      's',
+      el.type === 'image' ? 'Escala de imagen' : 'Escala del diseño',
+      0.01,
+      2,
+      0.01,
+      (v) => Math.round(v * 100) + '%',
+    ));
     panel.append(range(el, 'rot', 'Rotación', 0, 360, 1, (v) => Math.round(v) + '°'));
     panel.append(range(el, 'opacity', 'Opacidad', 0.1, 1, 0.01, (v) => Math.round(v * 100) + '%'));
 
@@ -505,7 +513,7 @@ export function initUI(viewer) {
       const sideBadge = SIDE_LABELS[el.side] || el.side;
 
       const sizeSel = h('select', {
-        'aria-label': 'Tamaño límite',
+        'aria-label': 'Área de impresión',
         onclick: (e) => e.stopPropagation(),
         onchange: (e) => {
           commit();
@@ -561,7 +569,7 @@ export function initUI(viewer) {
             onclick: (e) => { e.stopPropagation(); removeElement(el.id); },
           }),
         )),
-      h('div', { class: 'layer-size-row' }, h('span', { text: 'Tamaño' }), sizeSel),
+      h('div', { class: 'layer-size-row' }, h('span', { text: 'Área impresión' }), sizeSel),
       isExpanded ? buildLayerProps(el) : null);
 
       layersEl.append(card);

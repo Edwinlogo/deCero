@@ -111,12 +111,17 @@ export function getElementSizeCm(el) {
   return { wCm, hCm, areaCm2 };
 }
 
-/** Espacio efectivo de impresión: adapta Tamaño Carta (horizontal/vertical) a la orientación de la imagen. */
+/** Espacio efectivo de impresión: adapta Tamaño Carta (horizontal/vertical) a la orientación real de la imagen (incluso rotada). */
 export function getEffectiveSpace(el, fallbackSpaceId = null) {
   const sp = getPrintSpace(el?.space || fallbackSpaceId);
   if (!el || sp.unlimited || sp.w === sp.h) return sp;
   const b = localSize(el);
-  const elIsLandscape = b.w > b.h;
+  const a = ((el.rot || 0) * Math.PI) / 180;
+  const cos = Math.abs(Math.cos(a));
+  const sin = Math.abs(Math.sin(a));
+  const rotW = b.w * cos + b.h * sin;
+  const rotH = b.w * sin + b.h * cos;
+  const elIsLandscape = rotW > rotH;
   const spIsLandscape = sp.w > sp.h;
   if (elIsLandscape !== spIsLandscape) {
     return { ...sp, w: sp.h, h: sp.w, desc: `${sp.desc} horizontal` };
