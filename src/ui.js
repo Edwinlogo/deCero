@@ -1,7 +1,7 @@
 // Interfaz de usuario: flotantes laterales, maximizar 3D, prenda por línea, diseño, capas y liquidación de precio.
 import { CONFIG, getLine, getReference, getSizesForAudience, getPrintSpace, money } from './config.js';
 import {
-  state, defaultProduct, normalizeProduct, on, emit, images, selected, addElement, removeElement, selectElement, duplicateElement, moveLayer, clearAll,
+  state, ALL_SIDES, SIDE_LABELS, allElements, defaultProduct, normalizeProduct, on, emit, images, selected, addElement, removeElement, selectElement, duplicateElement, moveLayer, clearAll,
   commit, changed, undo, redo, canUndo, canRedo, priceInfo, registerImage, newId, serializeDesign, loadDesign, loadImage,
 } from './state.js';
 import { exportArt, maxScaleForElement } from './render2d.js';
@@ -215,7 +215,7 @@ export function initUI(viewer) {
       ...(ref.customCollar ? [['Color del cuello', colorLabel(p.collarColor)]] : []),
       ['Talla', p.size],
       ['Estampados', (() => {
-        const count = [...state.elements.front, ...state.elements.back].filter((e) => !e.hidden).length;
+        const count = allElements().filter((e) => !e.hidden).length;
         return count ? `${count} ${count === 1 ? 'diseño' : 'diseños'}` : 'Sin estampado';
       })()],
     ];
@@ -269,7 +269,29 @@ export function initUI(viewer) {
     toast('Nombre y dorsal añadidos en la espalda');
   };
 
-  async function processFile(file) {
+  const stageAddPill = $('#stage-add-pill');
+  let pendingSpot = null;
+  function hideStageAddPill(clearSpot = true) {
+    stageAddPill.hidden = true;
+    if (clearSpot) pendingSpot = null;
+  }
+  on('empty-tap', (info) => {
+    if (!info) return hideStageAddPill(true);
+    pendingSpot = { side: info.side, x: info.pt.x, y: info.pt.y };
+    const r = stage.getBoundingClientRect();
+    const px = Math.max(90, Math.min(r.width - 90, info.clientX - r.left));
+    const py = Math.max(54, Math.min(r.height - 24, info.clientY - r.top));
+    stageAddPill.style.left = `${px}px`;
+    stageAddPill.style.top = `${py}px`;
+    stageAddPill.hidden = false;
+  });
+  stageAddPill.addEventListener('click', (e) => {
+    e.stopPropagation();
+    hideStageAddPill(false);
+    fileInput.click();
+  });
+
+  async function processFile(file, spot = null) {
     if (!file || !file.type.startsWith('image/')) return toast('Ese archivo no es una imagen');
     if (file.size > 25e6) return toast('La imagen pesa más de 25 MB');
     const url = URL.createObjectURL(file);
@@ -289,10 +311,18 @@ export function initUI(viewer) {
       const id = newId('img');
       await registerImage(id, src);
       const spId = state.product.printSpace;
-      const imgEl = { type: 'image', imgId: id, name: file.name.replace(/\.[^.]+$/, '').slice(0, 24), space: spId, y: -0.25, s: 1.1 };
+      const imgEl = {
+        type: 'image',
+        imgId: id,
+        name: file.name.replace(/\.[^.]+$/, '').slice(0, 24),
+        space: spId,
+        x: spot ? spot.x : 0,
+        y: spot ? spot.y : -0.25,
+        s: 1.1,
+      };
       const maxS = maxScaleForElement(imgEl, spId);
       imgEl.s = Math.min(imgEl.s, maxS * 0.92);
-      addElement(imgEl);
+      addElement(imgEl, spot?.side || null);
     } catch {
       toast('No se pudo leer la imagen');
     } finally {
@@ -301,7 +331,10 @@ export function initUI(viewer) {
   }
   const fileInput = $('#file-input');
   fileInput.addEventListener('change', () => {
-    [...fileInput.files].slice(0, 1).forEach(processFile);
+    const spot = pendingSpot;
+    pendingSpot = null;
+    hideStageAddPill(false);
+    [...fileInput.files].slice(0, 1).forEach((f) => processFile(f, spot));
     fileInput.value = '';
   });
   stage.addEventListener('dragover', (e) => { e.preventDefault(); stage.classList.add('dragover'); });
@@ -456,23 +489,20 @@ export function initUI(viewer) {
   function renderLayers() {
     binders = [];
     layersEl.innerHTML = '';
-    const list = [
-      ...[...state.elements.front].reverse(),
-      ...[...state.elements.back].reverse(),
-    ];
+    const list = ALL_SIDES.flatMap((s) => [...(state.elements[s] || [])].reverse());
     const countEl = $('#layers-count');
     if (countEl) countEl.textContent = list.length ? `(${list.length})` : '';
     if (expandedId && !list.some((e) => e.id === expandedId)) expandedId = null;
 
     const focusElement = (el) => {
-      if (el.side !== state.side) viewer.setView(el.side);
+      if (el.side !== state.side || el.side === 'sleeveL' || el.side === 'sleeveR') viewer.setView(el.side);
       selectElement(el.id);
     };
 
     list.forEach((el) => {
       const isSelected = el.id === state.selectedId;
       const isExpanded = el.id === expandedId;
-      const sideBadge = el.side === 'front' ? 'Frente' : 'Espalda';
+      const sideBadge = SIDE_LABELS[el.side] || el.side;
 
       const sizeSel = h('select', {
         'aria-label': 'Tamaño límite',
@@ -649,7 +679,8 @@ export function initUI(viewer) {
     else if (mod && e.key.toLowerCase() === 'd' && el) { e.preventDefault(); duplicateElement(el.id); }
     else if ((e.key === 'Delete' || e.key === 'Backspace') && el) { e.preventDefault(); removeElement(el.id); }
     else if (e.key === 'Escape') {
-      if (!viewPopover.hidden) setViewMenuOpen(false);
+      if (!stageAddPill.hidden) hideStageAddPill(true);
+      else if (!viewPopover.hidden) setViewMenuOpen(false);
       else if (!bgPopover.hidden) setBgOpen(false);
       else if (el) selectElement(null);
       else if (app.classList.contains('maximized')) setMaximized(false);

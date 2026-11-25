@@ -4,8 +4,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { ATLAS_SIZE, paintAtlas, uvToDesign, hitHandle, hitElement, maxScaleForElement } from './render2d.js';
-import { state, on, emit, selected, selectElement, removeElement, commit, changed } from './state.js';
+import { ATLAS_SIZE, paintAtlas, uvToDesign, hitHandle, hitElement } from './render2d.js';
+import { state, on, emit, selected, selectElement, removeElement, moveElementSide, commit, changed } from './state.js';
 import { getReference } from './config.js';
 
 const MODEL_SPECS = {
@@ -359,8 +359,9 @@ export function createViewer(container) {
       return;
     }
     if (!state.guides || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    emit('empty-tap', null);
     const hit = pick(e);
-    tap = { x: e.clientX, y: e.clientY, onShirt: !!hit };
+    tap = { x: e.clientX, y: e.clientY, hit };
     if (!hit) return;
     const { side, pt } = hit;
     const sel = selected();
@@ -388,7 +389,7 @@ export function createViewer(container) {
         return;
       }
     }
-    const list = state.elements[side];
+    const list = state.elements[side] || [];
     for (let i = list.length - 1; i >= 0; i--) {
       if (hitElement(list[i], pt)) {
         e.stopImmediatePropagation();
@@ -417,20 +418,32 @@ export function createViewer(container) {
     if (drag) {
       const el = selected();
       if (!el || el.id !== drag.id) return;
-      const hit = pick(e, drag.side);
-      if (!hit) return;
-      const { pt } = hit;
       if (drag.mode === 'move') {
-        el.x = Math.max(-1.2, Math.min(1.2, pt.x + drag.off.x));
-        el.y = Math.max(-1.35, Math.min(1.35, pt.y + drag.off.y));
-      } else if (drag.mode === 'scale') {
-        const d = Math.hypot(pt.x - el.x, pt.y - el.y);
-        el.s = Math.max(0.01, Math.min(2, drag.s0 * (d / drag.d0)));
-      } else if (drag.mode === 'rotate') {
-        const a = Math.atan2(pt.y - el.y, pt.x - el.x);
-        let r = drag.rot0 + ((a - drag.a0) * 180) / Math.PI;
-        r = ((r % 360) + 360) % 360;
-        el.rot = snapAngle(r) % 360;
+        const hit = pick(e);
+        if (!hit) return;
+        if (hit.side !== el.side) {
+          moveElementSide(el, hit.side);
+          drag.side = hit.side;
+          drag.off = { x: 0, y: 0 };
+          el.x = hit.pt.x;
+          el.y = hit.pt.y;
+        } else {
+          el.x = hit.pt.x + drag.off.x;
+          el.y = hit.pt.y + drag.off.y;
+        }
+      } else {
+        const hit = pick(e, drag.side);
+        if (!hit) return;
+        const { pt } = hit;
+        if (drag.mode === 'scale') {
+          const d = Math.hypot(pt.x - el.x, pt.y - el.y);
+          el.s = Math.max(0.01, Math.min(2, drag.s0 * (d / drag.d0)));
+        } else if (drag.mode === 'rotate') {
+          const a = Math.atan2(pt.y - el.y, pt.x - el.x);
+          let r = drag.rot0 + ((a - drag.a0) * 180) / Math.PI;
+          r = ((r % 360) + 360) % 360;
+          el.rot = snapAngle(r) % 360;
+        }
       }
       changed(false, el.side);
       return;
@@ -452,7 +465,7 @@ export function createViewer(container) {
         const h = sel && sel.side === hit.side ? hitHandle(sel, hit.pt) : null;
         if (h === 'scale') cur = 'nwse-resize';
         else if (h) cur = 'pointer';
-        else if (state.elements[hit.side].some((el) => hitElement(el, hit.pt))) cur = 'grab';
+        else if ((state.elements[hit.side] || []).some((el) => hitElement(el, hit.pt))) cur = 'grab';
       }
       canvas.style.cursor = cur;
     });
@@ -465,6 +478,11 @@ export function createViewer(container) {
       emit('layers');
     } else if (tap && !tap.moved && e.type === 'pointerup' && pointers === 0 && state.guides) {
       if (state.selectedId) selectElement(null);
+      if (tap.hit) {
+        emit('empty-tap', { clientX: e.clientX, clientY: e.clientY, side: tap.hit.side, pt: tap.hit.pt });
+      } else {
+        emit('empty-tap', null);
+      }
     }
     tap = null;
   };
@@ -488,6 +506,8 @@ export function createViewer(container) {
     back: { az: Math.PI, polar: Math.PI / 2 - 0.03, rMul: 1 },
     left: { az: Math.PI / 2, polar: Math.PI / 2 - 0.02, rMul: 0.96 },
     right: { az: -Math.PI / 2, polar: Math.PI / 2 - 0.02, rMul: 0.96 },
+    sleeveL: { az: Math.PI / 2, polar: Math.PI / 2 - 0.02, rMul: 0.96 },
+    sleeveR: { az: -Math.PI / 2, polar: Math.PI / 2 - 0.02, rMul: 0.96 },
   };
 
   let tween = null;
@@ -523,7 +543,10 @@ export function createViewer(container) {
     camera.position.setFromSpherical(tmpSph).add(orbit.target);
     if (tween.t >= 1) tween = null;
   }
-  orbit.addEventListener('start', () => (tween = null));
+  orbit.addEventListener('start', () => {
+    tween = null;
+    emit('empty-tap', null);
+  });
 
   let autoRotate = false;
   function setAutoRotate(v) {

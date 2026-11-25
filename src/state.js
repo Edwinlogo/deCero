@@ -56,9 +56,29 @@ export function normalizeProduct(p) {
   return p;
 }
 
+export const ALL_SIDES = ['front', 'back', 'sleeveL', 'sleeveR'];
+export const SIDE_LABELS = {
+  front: 'Frente',
+  back: 'Espalda',
+  sleeveL: 'Manga izq.',
+  sleeveR: 'Manga der.',
+};
+
+function emptyElements() {
+  return { front: [], back: [], sleeveL: [], sleeveR: [] };
+}
+
+function normalizeElements(els) {
+  const out = emptyElements();
+  for (const s of ALL_SIDES) {
+    out[s] = Array.isArray(els?.[s]) ? els[s] : [];
+  }
+  return out;
+}
+
 export const state = {
   product: defaultProduct(),
-  elements: { front: [], back: [] },
+  elements: emptyElements(),
   selectedId: null,
   side: 'front', // lado que mira a la cámara ('front' | 'back')
   guides: true,
@@ -71,7 +91,7 @@ export const images = new Map();
 let uid = 1;
 export const newId = (p = 'e') => p + Date.now().toString(36) + (uid++).toString(36);
 
-export const allElements = () => [...state.elements.front, ...state.elements.back];
+export const allElements = () => ALL_SIDES.flatMap((s) => state.elements[s] || []);
 export const findElement = (id) => allElements().find((e) => e.id === id) || null;
 export const selected = () => (state.selectedId ? findElement(state.selectedId) : null);
 
@@ -89,7 +109,7 @@ export function commit() {
 }
 function restore(s) {
   const d = JSON.parse(s);
-  state.elements = d.elements;
+  state.elements = normalizeElements(d.elements);
   state.selectedId = d.selectedId && findElement(d.selectedId) ? d.selectedId : null;
   changed(true);
   emit('history');
@@ -129,10 +149,21 @@ export function addElement(el, targetSide = null) {
   el.rot ??= 0;
   el.s ??= 1;
   el.opacity ??= 1;
-  state.elements[el.side].push(el);
+  (state.elements[el.side] ||= []).push(el);
   state.selectedId = el.id;
   changed(true, el.side);
   return el;
+}
+
+export function moveElementSide(el, newSide) {
+  if (!el || !ALL_SIDES.includes(newSide) || el.side === newSide) return;
+  const oldList = state.elements[el.side];
+  if (oldList) {
+    const idx = oldList.indexOf(el);
+    if (idx >= 0) oldList.splice(idx, 1);
+  }
+  el.side = newSide;
+  (state.elements[newSide] ||= []).push(el);
 }
 
 export function removeElement(id) {
@@ -187,10 +218,9 @@ export function clearSide(side) {
 }
 
 export function clearAll() {
-  if (!state.elements.front.length && !state.elements.back.length) return;
+  if (!allElements().length) return;
   commit();
-  state.elements.front = [];
-  state.elements.back = [];
+  for (const s of ALL_SIDES) state.elements[s] = [];
   state.selectedId = null;
   changed(true);
 }
@@ -202,11 +232,11 @@ export function priceInfo(product = state.product, elements = state.elements) {
   const ref = getReference(product.line, product.reference);
   const lines = [{ label: `${line.shortLabel} · ${ref.label}`, amount: ref.price }];
   const sides = [];
-  for (const side of ['front', 'back']) {
-    const visible = elements[side].filter((e) => !e.hidden);
+  for (const side of ALL_SIDES) {
+    const visible = (elements[side] || []).filter((e) => !e.hidden);
     if (!visible.length) continue;
     sides.push(side);
-    const sideLabel = side === 'front' ? 'Frente' : 'Espalda';
+    const sideLabel = SIDE_LABELS[side] || side;
     for (const el of visible) {
       const sp = getPrintSpace(el.space || product.printSpace);
       if (sp.unlimited) {
@@ -235,7 +265,7 @@ export function priceInfo(product = state.product, elements = state.elements) {
 // ---------- Serialización ----------
 export function usedImages(elements = state.elements) {
   const ids = new Set();
-  [...elements.front, ...elements.back].forEach((e) => e.type === 'image' && ids.add(e.imgId));
+  ALL_SIDES.flatMap((s) => elements[s] || []).forEach((e) => e.type === 'image' && ids.add(e.imgId));
   const out = {};
   ids.forEach((id) => images.has(id) && (out[id] = images.get(id).src));
   return out;
@@ -277,7 +307,7 @@ export async function loadDesign(data) {
   }
   const base = defaultProduct();
   state.product = normalizeProduct({ ...base, ...(data.product || {}) });
-  state.elements = { front: data.elements?.front || [], back: data.elements?.back || [] };
+  state.elements = normalizeElements(data.elements);
   state.selectedId = null;
   resetHistory();
   emit('product');

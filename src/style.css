@@ -369,6 +369,15 @@ dialog[open] { display: flex; flex-direction: column; }
 .done-box { display: grid; gap: 12px; text-align: center; justify-items: center; }
 .done-box .ok { font-size: 46px; }
 
+.stage-add-pill {
+  position: absolute; z-index: 25; transform: translate(-50%, -125%);
+  background: var(--accent); color: #fff; border: 0; border-radius: 999px;
+  padding: 8px 14px; font-size: 12.5px; font-weight: 700; white-space: nowrap;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, .36); cursor: pointer;
+  transition: transform .12s ease, background .15s;
+}
+.stage-add-pill:hover { background: #1d4ed8; transform: translate(-50%, -132%); }
+
 .toasts { position: fixed; bottom: 86px; left: 50%; transform: translateX(-50%); display: grid; gap: 8px; z-index: 100; pointer-events: none; }
 .toast {
   background: #0f172a; color: #fff; padding: 11px 16px; border-radius: 12px; font-size: 13.5px; font-weight: 500; box-shadow: var(--shadow);

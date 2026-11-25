@@ -16,19 +16,25 @@ export const UV_ZONES = {
   collar: { u0: 0.0, v0: 0.941, u1: 0.55, v1: 1.0 },
 };
 
-// Centros UV del área de estampado para frente y espalda
+// Centros UV del área de estampado para frente, espalda y mangas
 export const SIDE_CENTER = {
   front: { u: 0.26, v: 0.375 },
   back: { u: 0.742, v: 0.375 },
+  sleeveR: { u: 0.1925, v: 0.831 },
+  sleeveL: { u: 0.575, v: 0.831 },
 };
+
+const PRINTABLE_SIDES = ['front', 'back', 'sleeveL', 'sleeveR'];
 
 // Convierte UV del GLB -> lado y coordenadas de diseño (x: derecha, y: abajo)
 export function uvToDesign(u, v, forceSide = null) {
   let side = forceSide;
   if (!side) {
-    if (v > 0.721) return null;
-    side = u < 0.502 ? 'front' : 'back';
+    if (v <= 0.721) side = u < 0.502 ? 'front' : 'back';
+    else if (v <= 0.941) side = u < 0.385 ? 'sleeveR' : u <= 0.765 ? 'sleeveL' : null;
+    else return null;
   }
+  if (!side || !SIDE_CENTER[side]) return null;
   const c = SIDE_CENTER[side];
   return {
     side,
@@ -105,9 +111,22 @@ export function getElementSizeCm(el) {
   return { wCm, hCm, areaCm2 };
 }
 
+/** Espacio efectivo de impresión: adapta Tamaño Carta (horizontal/vertical) a la orientación de la imagen. */
+export function getEffectiveSpace(el, fallbackSpaceId = null) {
+  const sp = getPrintSpace(el?.space || fallbackSpaceId);
+  if (!el || sp.unlimited || sp.w === sp.h) return sp;
+  const b = localSize(el);
+  const elIsLandscape = b.w > b.h;
+  const spIsLandscape = sp.w > sp.h;
+  if (elIsLandscape !== spIsLandscape) {
+    return { ...sp, w: sp.h, h: sp.w, desc: `${sp.desc} horizontal` };
+  }
+  return { ...sp, desc: `${sp.desc} vertical` };
+}
+
 /** Escala máxima permitida para un elemento según el espacio de impresión seleccionado. */
 export function maxScaleForElement(el, spaceId) {
-  const sp = getPrintSpace(spaceId);
+  const sp = getEffectiveSpace({ ...el, space: spaceId || el?.space }, spaceId);
   if (sp.unlimited) return 8;
   const b = localSize(el);
   const bw = b.w / 100;
@@ -279,14 +298,14 @@ export function drawElement(ctx, el, ppu = PPU, cx = 0, cy = 0) {
 
 function visibleBounds(el) {
   const b = getBounds(el);
-  const sp = getPrintSpace(el.space);
+  const sp = getEffectiveSpace(el);
   if (sp.unlimited) return b;
   return { w: Math.min(b.w, sp.w), h: Math.min(b.h, sp.h) };
 }
 
 function drawClippedElement(ctx, el, ppu = PPU, cx = 0, cy = 0, fallbackSpaceId = null) {
   if (el.hidden) return;
-  const sp = getPrintSpace(el.space || fallbackSpaceId);
+  const sp = getEffectiveSpace(el, fallbackSpaceId);
   if (sp.unlimited) {
     drawElement(ctx, el, ppu, cx, cy);
     return;
@@ -334,7 +353,7 @@ export function hitHandle(el, pt) {
 
 export function hitElement(el, pt) {
   if (el.hidden) return false;
-  const sp = getPrintSpace(el.space);
+  const sp = getEffectiveSpace(el);
   if (!sp.unlimited) {
     if (Math.abs(pt.x - el.x) > sp.w / 2 + 0.02 || Math.abs(pt.y - el.y) > sp.h / 2 + 0.02) return false;
   }
@@ -386,7 +405,7 @@ function drawGuides(ctx, el, cx, cy) {
 }
 
 function drawElementSpaceLimit(ctx, el, cx, cy, fallbackSpaceId) {
-  const sp = getPrintSpace(el.space || fallbackSpaceId);
+  const sp = getEffectiveSpace(el, fallbackSpaceId);
   if (sp.unlimited) return;
   const w = sp.w * PPU;
   const h = sp.h * PPU;
@@ -431,8 +450,10 @@ export function paintAtlas(ctx, { elements, product, guides = true, selectedId =
     );
   }
 
-  // Estampados en frente y espalda (recortados a su zona UV para no invadir la otra cara)
-  for (const side of ['front', 'back']) {
+  // Estampados en frente, espalda y mangas (recortados a su zona UV)
+  for (const side of PRINTABLE_SIDES) {
+    const list = elements[side] || [];
+    if (!list.length) continue;
     const rect = UV_ZONES[side];
     const c = SIDE_CENTER[side];
     const cx = c.u * ATLAS_SIZE;
@@ -447,11 +468,11 @@ export function paintAtlas(ctx, { elements, product, guides = true, selectedId =
     );
     ctx.clip();
 
-    for (const el of elements[side]) {
+    for (const el of list) {
       drawClippedElement(ctx, el, PPU, cx, cy, product?.printSpace);
     }
     if (guides) {
-      const sel = elements[side].find((e) => e.id === selectedId);
+      const sel = list.find((e) => e.id === selectedId);
       if (sel) {
         drawElementSpaceLimit(ctx, sel, cx, cy, product?.printSpace);
         drawGuides(ctx, sel, cx, cy);
@@ -463,14 +484,14 @@ export function paintAtlas(ctx, { elements, product, guides = true, selectedId =
 
 /** Exporta sólo el arte de un lado (PNG transparente recortado a las estampas). */
 export function exportArt(elements, side, scale = 2.5) {
-  const list = elements[side].filter((e) => !e.hidden);
+  const list = (elements[side] || []).filter((e) => !e.hidden);
   if (!list.length) return null;
   let x0 = Infinity;
   let y0 = Infinity;
   let x1 = -Infinity;
   let y1 = -Infinity;
   for (const el of list) {
-    const sp = getPrintSpace(el.space);
+    const sp = getEffectiveSpace(el);
     const b = getBounds(el);
     const a = (el.rot * Math.PI) / 180;
     let ex = (Math.abs(b.w * Math.cos(a)) + Math.abs(b.h * Math.sin(a))) / 2;
