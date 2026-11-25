@@ -16,7 +16,7 @@ export const CONFIG = {
     { id: 'pequeno', label: 'Pequeño', desc: '7cm × 7cm', w: 0.4, h: 0.4, price: 4500, unlimited: false },
     { id: 'mediano', label: 'Mediano', desc: '15cm × 15cm', w: 0.78, h: 0.78, price: 8000, unlimited: false },
     { id: 'grande', label: 'Grande', desc: 'Carta', w: 1.08, h: 1.4, price: 10000, unlimited: false },
-    { id: 'especial', label: 'Diseño especiales', desc: '$200 / cm²', w: 1.48, h: 2.05, pricePerCm2: 200, unlimited: true },
+    { id: 'especial', label: 'Diseño especial', desc: '$200 / cm²', w: 1.48, h: 2.05, pricePerCm2: 200, unlimited: true },
   ],
   productLines: [
     {
@@ -116,7 +116,7 @@ export function getSizesForAudience(audience) {
 }
 
 export function getPrintSpace(spaceId) {
-  return CONFIG.printSpaces.find((s) => s.id === spaceId) || CONFIG.printSpaces[2];
+  return CONFIG.printSpaces.find((s) => s.id === spaceId) || CONFIG.printSpaces[3];
 }
 
 export function money(v) {

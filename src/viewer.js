@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { ATLAS_SIZE, paintAtlas, uvToDesign, hitHandle, hitElement } from './render2d.js';
+import { ATLAS_SIZE, paintAtlas, uvToDesign, hitHandle, hitElement, autoDowngradePrintSpace } from './render2d.js';
 import { state, on, emit, selected, selectElement, removeElement, moveElementSide, commit, changed } from './state.js';
 import { getReference } from './config.js';
 
@@ -436,8 +436,10 @@ export function createViewer(container) {
         if (!hit) return;
         const { pt } = hit;
         if (drag.mode === 'scale') {
+          const prevS = el.s;
           const d = Math.hypot(pt.x - el.x, pt.y - el.y);
           el.s = Math.max(0.01, drag.s0 * (d / drag.d0));
+          autoDowngradePrintSpace(el, prevS);
         } else if (drag.mode === 'rotate') {
           const a = Math.atan2(pt.y - el.y, pt.x - el.x);
           let r = drag.rot0 + ((a - drag.a0) * 180) / Math.PI;

@@ -4,7 +4,7 @@ import {
   state, ALL_SIDES, SIDE_LABELS, allElements, defaultProduct, normalizeProduct, on, emit, images, selected, addElement, removeElement, selectElement, duplicateElement, moveLayer, clearAll,
   commit, changed, undo, redo, canUndo, canRedo, priceInfo, registerImage, newId, serializeDesign, loadDesign, loadImage,
 } from './state.js';
-import { exportArt, maxScaleForElement } from './render2d.js';
+import { exportArt, maxScaleForElement, autoDowngradePrintSpace } from './render2d.js';
 import { kvGet, kvSet } from './storage.js';
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -311,7 +311,7 @@ export function initUI(viewer) {
       const src = file.type === 'image/jpeg' ? c.toDataURL('image/jpeg', 0.92) : c.toDataURL('image/png');
       const id = newId('img');
       await registerImage(id, src);
-      const spId = 'grande';
+      const spId = 'especial';
       const imgEl = {
         type: 'image',
         imgId: id,
@@ -430,7 +430,9 @@ export function initUI(viewer) {
     const applyPct = (pct) => {
       const next = Math.max(1, Math.round(pct));
       begin(el.id + 's');
+      const prevS = el.s;
       el.s = next / 100;
+      autoDowngradePrintSpace(el, prevS);
       if (document.activeElement !== input) input.value = next;
       changed(false, el.side);
     };
@@ -441,7 +443,9 @@ export function initUI(viewer) {
       const raw = parseInt(input.value, 10);
       if (!Number.isFinite(raw) || raw < 1) return;
       begin(el.id + 's');
+      const prevS = el.s;
       el.s = raw / 100;
+      autoDowngradePrintSpace(el, prevS);
       changed(false, el.side);
     });
     input.addEventListener('blur', () => {
@@ -574,7 +578,7 @@ export function initUI(viewer) {
       const isExpanded = el.id === expandedId;
       const sideBadge = SIDE_LABELS[el.side] || el.side;
 
-      const currentSpace = el.space || 'grande';
+      const currentSpace = el.space || 'especial';
       const sizeSel = h('select', {
         'aria-label': 'Área de impresión',
         onclick: (e) => e.stopPropagation(),
@@ -596,6 +600,7 @@ export function initUI(viewer) {
         selected: currentSpace === sp.id,
       })));
       sizeSel.value = currentSpace;
+      binders.push(() => { sizeSel.value = el.space || 'especial'; });
 
       const card = h('li', {
         class: 'layer-card' + (isSelected ? ' active' : '') + (el.hidden ? ' off' : ''),

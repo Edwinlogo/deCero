@@ -132,15 +132,46 @@ export function getEffectiveSpace(el, fallbackSpaceId = null) {
 /** Escala máxima para maximizar un elemento dentro de su espacio de impresión seleccionado. */
 export function maxScaleForElement(el, spaceId) {
   const sp = getEffectiveSpace({ ...el, space: spaceId || el?.space }, spaceId);
-  if (sp.unlimited) return 8;
   const b = localSize(el);
   const a = ((el?.rot || 0) * Math.PI) / 180;
   const cos = Math.abs(Math.cos(a));
   const sin = Math.abs(Math.sin(a));
   const bw = (b.w * cos + b.h * sin) / 100;
   const bh = (b.w * sin + b.h * cos) / 100;
-  if (bw <= 0 || bh <= 0) return 4.5;
+  if (bw <= 0 || bh <= 0) return 1.5;
   return Math.max(0.01, Math.min(sp.w / bw, sp.h / bh));
+}
+
+const SPACE_ORDER = ['pequeno', 'mediano', 'grande', 'especial'];
+
+/** Determina el área de impresión más pequeña en la que cabe el elemento actual. */
+export function fitPrintSpaceForElement(el) {
+  const b = localSize(el);
+  const a = ((el?.rot || 0) * Math.PI) / 180;
+  const cos = Math.abs(Math.cos(a));
+  const sin = Math.abs(Math.sin(a));
+  const w = ((b.w * cos + b.h * sin) * (el.s || 0.01)) / 100;
+  const h = ((b.w * sin + b.h * cos) * (el.s || 0.01)) / 100;
+  const eps = 0.005;
+  for (const id of ['pequeno', 'mediano', 'grande']) {
+    const sp = getEffectiveSpace({ ...el, space: id }, id);
+    if (w <= sp.w + eps && h <= sp.h + eps) return id;
+  }
+  return 'especial';
+}
+
+/** Al reducir la escala, baja automáticamente el área de impresión a una igual o inferior que contenga la imagen. */
+export function autoDowngradePrintSpace(el, prevScale) {
+  if (!el || !(el.s < prevScale)) return false;
+  const curId = el.space || 'especial';
+  const curIdx = SPACE_ORDER.indexOf(curId);
+  const bestId = fitPrintSpaceForElement(el);
+  const bestIdx = SPACE_ORDER.indexOf(bestId);
+  if (bestIdx >= 0 && curIdx >= 0 && bestIdx < curIdx) {
+    el.space = bestId;
+    return true;
+  }
+  return false;
 }
 
 function drawTextLine(ctx, text, width, y, el, maxW) {

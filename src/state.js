@@ -15,7 +15,7 @@ export function defaultProduct() {
     line: 'basica',
     audience: 'Hombre',
     reference: 'algodon-175',
-    printSpace: 'grande',
+    printSpace: 'especial',
     color: white,
     collarColor: black,
     size: 'M',
@@ -50,7 +50,7 @@ export function normalizeProduct(p) {
   if (!CONFIG.colors.some((c) => c.hex.toLowerCase() === (p.collarColor || '').toLowerCase())) {
     p.collarColor = CONFIG.colors.find((c) => c.name === 'Negro')?.hex || CONFIG.colors[0].hex;
   }
-  p.printSpace = 'grande';
+  p.printSpace = 'especial';
   return p;
 }
 
@@ -141,7 +141,7 @@ export function addElement(el, targetSide = null) {
   commit();
   el.id = newId();
   el.side = targetSide || state.side;
-  el.space ??= 'grande';
+  el.space ??= 'especial';
   el.x ??= 0;
   el.y ??= -0.15;
   el.rot ??= 0;
